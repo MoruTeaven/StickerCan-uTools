@@ -90,11 +90,8 @@
                     <button class="tab-btn" data-tab="sogou">
                         搜狗
                     </button>
-                    <button class="tab-btn" data-tab="doutula">
-                        斗图啦
-                    </button>
-                    <button class="tab-btn" data-tab="qqtouxiang">
-                        表情包搜索
+                    <button class="tab-btn" data-tab="tangdouzi">
+                        糖豆子
                     </button>
                 </div>
 
@@ -162,11 +159,8 @@
             <!-- 设置视图 -->
             <div id="settingsView" class="view">
                 <div class="settings-container">
-                    <!-- 左侧设置导航 -->
+                    <!-- 顶部设置导航 -->
                     <nav class="settings-nav">
-                        <div class="settings-nav-header">
-                            <h2><i class="mdi mdi-cog"></i> 设置</h2>
-                        </div>
                         <div class="settings-nav-items">
                             <button class="settings-nav-item active" data-settings="appearance">
                                 <i class="mdi mdi-palette"></i>
@@ -191,7 +185,7 @@
                         </div>
                     </nav>
 
-                    <!-- 右侧设置内容 -->
+                    <!-- 下方设置内容 -->
                     <div class="settings-content">
                         <!-- 外观设置 -->
                         <div id="settingsAppearance" class="settings-panel active">
@@ -240,13 +234,31 @@
                             </div>
                             <div class="settings-panel-body">
                                 <div class="form-group">
-                                    <label>图床选择</label>
-                                    <select id="cloudProvider" class="form-select">
-                                        <option value="imgbb">ImgBB（免费，推荐）</option>
-                                        <option value="smms">SM.MS（免费）</option>
-                                        <option value="s3">S3 兼容存储</option>
-                                        <option value="github">GitHub + CDN</option>
-                                    </select>
+                                <label>图床选择</label>
+                                <select id="cloudProvider" class="form-select">
+                                    <option value="utools">uTools 内置存储（推荐）</option>
+                                    <option value="imgbb">ImgBB（免费）</option>
+                                    <option value="smms">SM.MS（免费）</option>
+                                    <option value="s3">S3 兼容存储</option>
+                                    <option value="github">GitHub + CDN</option>
+                                </select>
+                            </div>
+
+                                <div id="utoolsConfig" class="provider-config">
+                                    <div class="config-card">
+                                        <div class="config-card-header">
+                                            <i class="mdi mdi-ufo-outline"></i>
+                                            <span>uTools 内置存储配置</span>
+                                        </div>
+                                        <p class="form-hint">
+                                            <i class="mdi mdi-check-circle"></i>
+                                            uTools 内置存储无需额外配置，直接使用即可
+                                        </p>
+                                        <p class="form-hint">
+                                            <i class="mdi mdi-information"></i>
+                                            数据存储在 uTools 私有空间，安全可靠且支持跨设备同步
+                                        </p>
+                                    </div>
                                 </div>
 
                                 <div id="imgbbConfig" class="provider-config">
@@ -579,16 +591,13 @@
                 </div>
 
                 <div class="form-group">
-                    <label>标签</label>
-                    <div id="tagsInputsContainer" class="tags-inputs-container">
-                        <div class="tag-input-wrapper">
-                            <input type="text" class="tag-input" placeholder="输入标签">
-                        </div>
-                    </div>
-                    <button id="addTagBtn" class="add-tag-btn" type="button">
-                        <i class="mdi mdi-plus"></i> 添加标签
-                    </button>
-                </div>
+            <label>标签</label>
+            <div id="tagsInputsContainer" class="tags-inputs-container">
+            </div>
+            <button id="addTagBtn" class="add-tag-btn" type="button">
+                <i class="mdi mdi-plus"></i> 添加标签
+            </button>
+        </div>
 
                 <div class="form-actions">
                     <button id="uploadBtn" class="btn btn-warning">

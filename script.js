@@ -101,29 +101,52 @@ class EmotionManager {
 
     async loadData() {
         try {
+            console.log('===== 开始加载数据 =====');
+            
             const emotionsData = await utools.db.get('emotions');
+            console.log('读取到的 emotionsData:', emotionsData);
+            
             const settingsData = await utools.db.get('settings');
+            console.log('读取到的 settingsData:', settingsData);
             
             if (emotionsData) {
                 this.emotions = emotionsData.data || [];
+                console.log('加载的表情包数量:', this.emotions.length);
             }
             
             if (settingsData) {
                 this.settings = settingsData.data;
+                console.log('加载到的 settings:', this.settings);
             } else {
+                console.log('没有找到已保存的设置，使用默认值');
+                // 首次初始化，设置默认值
+                let defaultLocalPath = '';
+                if (window.emotionCan && typeof window.emotionCan.getDefaultDir === 'function') {
+                    defaultLocalPath = window.emotionCan.getDefaultDir();
+                }
+                
                 this.settings = {
-                    cloudProvider: 's3',
-                    localPath: '',
+                    cloudProvider: 'utools',
+                    localPath: defaultLocalPath,
                     cloudConfig: {},
                     syncConfig: {}
                 };
+                console.log('使用的默认 settings:', this.settings);
             }
+            
+            console.log('===== 数据加载结束 =====');
         } catch (error) {
             console.error('加载数据失败:', error);
             this.emotions = [];
+            
+            let defaultLocalPath = '';
+            if (window.emotionCan && typeof window.emotionCan.getDefaultDir === 'function') {
+                defaultLocalPath = window.emotionCan.getDefaultDir();
+            }
+            
             this.settings = {
-                cloudProvider: 's3',
-                localPath: '',
+                cloudProvider: 'utools',
+                localPath: defaultLocalPath,
                 cloudConfig: {},
                 syncConfig: {}
             };
@@ -132,26 +155,65 @@ class EmotionManager {
 
     async saveData() {
         try {
-            await utools.db.put({
+            console.log('===== 开始保存表情包数据 =====');
+            console.log('准备保存的表情包数量:', this.emotions.length);
+            console.log('准备保存的表情包:', this.emotions);
+            
+            // 先删除旧数据
+            try {
+                await utools.db.remove('emotions');
+                console.log('旧表情包数据已删除');
+            } catch (e) {
+                console.log('没有旧表情包数据，无需删除');
+            }
+            
+            const result = await utools.db.put({
                 _id: 'emotions',
                 data: this.emotions
             });
+            
+            console.log('表情包数据保存成功，返回结果:', result);
+            
+            // 验证是否真的保存成功了
+            const verifyData = await utools.db.get('emotions');
+            console.log('验证保存后读取到的表情包数据:', verifyData);
+            
+            console.log('===== 表情包数据保存流程结束 =====');
         } catch (error) {
             console.error('保存表情包数据失败:', error);
-            this.showMessage('保存失败', 'error');
+            this.showMessage('保存失败: ' + error.message, 'error');
         }
     }
 
     async saveSettings() {
         try {
-            await utools.db.put({
+            console.log('===== 开始保存设置 =====');
+            console.log('准备保存到数据库的 settings:', this.settings);
+            
+            // 先删除旧数据
+            try {
+                await utools.db.remove('settings');
+                console.log('旧设置已删除');
+            } catch (e) {
+                console.log('没有旧设置，无需删除');
+            }
+            
+            const result = await utools.db.put({
                 _id: 'settings',
                 data: this.settings
             });
+            
+            console.log('设置保存成功，返回结果:', result);
+            
+            // 验证是否真的保存成功了
+            const verifyData = await utools.db.get('settings');
+            console.log('验证保存后读取到的数据:', verifyData);
+            
+            console.log('===== 保存流程结束 =====');
             this.showMessage('设置保存成功', 'success');
         } catch (error) {
             console.error('保存设置失败:', error);
-            this.showMessage('设置保存失败', 'error');
+            this.showMessage('设置保存失败: ' + error.message, 'error');
         }
     }
 
@@ -315,8 +377,8 @@ class EmotionManager {
             }
         });
 
-        document.getElementById('saveSettingsBtn').addEventListener('click', () => {
-            this.saveSettingsFromForm();
+        document.getElementById('saveSettingsBtn').addEventListener('click', async () => {
+            await this.saveSettingsFromForm();
         });
 
         document.getElementById('testConnectionBtn').addEventListener('click', () => {
@@ -329,6 +391,21 @@ class EmotionManager {
 
         document.getElementById('syncProvider').addEventListener('change', (e) => {
             this.toggleSyncConfig(e.target.value);
+        });
+
+        // 主题选项事件监听
+        document.querySelectorAll('input[name="theme"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                this.themeManager.setUserPreference(e.target.value);
+            });
+        });
+
+        // 设置导航切换
+        document.querySelectorAll('.settings-nav-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const settingsType = item.dataset.settings;
+                this.switchSettingsPanel(settingsType);
+            });
         });
 
         document.getElementById('selectFolderBtn').addEventListener('click', () => {
@@ -367,7 +444,7 @@ class EmotionManager {
                         const folderPath = result[0];
                         document.getElementById('localPath').value = folderPath;
                         this.settings.localPath = folderPath;
-                        this.showMessage('本地存储路径已选择', 'success');
+                        this.showMessage('本地存储路径已选择，请点击保存设置', 'info');
                         return;
                     }
                 } catch (apiError) {
@@ -382,7 +459,7 @@ class EmotionManager {
                 if (folderPath) {
                     document.getElementById('localPath').value = folderPath;
                     this.settings.localPath = folderPath;
-                    this.showMessage('本地存储路径已设置', 'success');
+                    this.showMessage('本地存储路径已设置，请点击保存设置', 'info');
                     return;
                 }
             }
@@ -435,6 +512,20 @@ class EmotionManager {
         this.renderView(viewName);
     }
 
+    switchSettingsPanel(panelType) {
+        // 更新导航激活状态
+        document.querySelectorAll('.settings-nav-item').forEach(item => {
+            item.classList.remove('active');
+        });
+        document.querySelector(`.settings-nav-item[data-settings="${panelType}"]`).classList.add('active');
+
+        // 切换面板
+        document.querySelectorAll('.settings-panel').forEach(panel => {
+            panel.classList.remove('active');
+        });
+        document.getElementById(`settings${panelType.charAt(0).toUpperCase() + panelType.slice(1)}`).classList.add('active');
+    }
+
     switchTab(tabName) {
         this.currentTab = tabName;
         
@@ -470,10 +561,8 @@ class EmotionManager {
             this.searchBaidu(keyword);
         } else if (this.currentTab === 'sogou') {
             this.searchSogou(keyword);
-        } else if (this.currentTab === 'doutula') {
-            this.searchDoutula(keyword);
-        } else if (this.currentTab === 'qqtouxiang') {
-            this.searchQqtouxiang(keyword);
+        } else if (this.currentTab === 'tangdouzi') {
+            this.searchTangdouzi(keyword);
         }
     }
 
@@ -490,45 +579,7 @@ class EmotionManager {
         externalResults.innerHTML = '';
     }
 
-    async searchDoutula(keyword) {
-        if (!keyword) {
-            this.showMessage('请输入搜索关键词', 'error');
-            return;
-        }
 
-        const externalResults = document.getElementById('externalResults');
-        externalResults.style.display = 'block';
-        externalResults.innerHTML = '<p class="hint-text">正在搜索...</p>';
-
-        try {
-            const url = `https://www.doutula.com/search?keyword=${encodeURIComponent(keyword)}`;
-            const response = await fetch(url);
-            const html = await response.text();
-            
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(html, 'text/html');
-            
-            const images = [];
-            const imgElements = doc.querySelectorAll('img[data-original]');
-            
-            imgElements.forEach(img => {
-                const originalSrc = img.getAttribute('data-original') || img.getAttribute('src');
-                if (originalSrc && originalSrc.startsWith('http') && !originalSrc.includes('loading')) {
-                    images.push(originalSrc);
-                }
-            });
-
-            if (images.length > 0) {
-                this.displayExternalResults(images, keyword);
-            } else {
-                externalResults.innerHTML = '<p class="hint-text">未找到表情包，请尝试其他关键词</p>';
-            }
-        } catch (error) {
-            console.error('搜索失败:', error);
-            externalResults.innerHTML = '<p class="hint-text">搜索失败，请稍后重试</p>';
-            this.showMessage('搜索失败: ' + error.message, 'error');
-        }
-    }
 
     async searchApihz(keyword, page = 1) {
         if (!keyword) {
@@ -845,52 +896,144 @@ class EmotionManager {
                 const scrollTop = mainContent.scrollTop;
                 const clientHeight = mainContent.clientHeight;
                 
-                // 当滚动到距离底部 200px 时加载更多
                 if (scrollTop + clientHeight >= scrollHeight - 200) {
                     this.sogouLoading = true;
                     this.searchSogou(this.currentSogouKeyword, this.currentSogouPage + 1);
+                }
+            } else if (this.currentTab === 'tangdouzi' && this.tangdouziHasMore && !this.tangdouziLoading) {
+                const scrollHeight = mainContent.scrollHeight;
+                const scrollTop = mainContent.scrollTop;
+                const clientHeight = mainContent.clientHeight;
+                
+                if (scrollTop + clientHeight >= scrollHeight - 200) {
+                    this.tangdouziLoading = true;
+                    this.searchTangdouzi(this.currentTangdouziKeyword, this.currentTangdouziPage + 1);
                 }
             }
         });
     }
 
-    async searchQqtouxiang(keyword) {
+
+
+    async searchTangdouzi(keyword, page = 1) {
         if (!keyword) {
             this.showMessage('请输入搜索关键词', 'error');
             return;
         }
 
         const externalResults = document.getElementById('externalResults');
-        externalResults.style.display = 'block';
-        externalResults.innerHTML = '<p class="hint-text">正在搜索...</p>';
+        
+        const isFirstPage = page === 1;
+        if (isFirstPage) {
+            externalResults.style.display = 'block';
+            externalResults.innerHTML = '<p class="hint-text">正在搜索...</p>';
+            this.tangdouziHasMore = true;
+            this.tangdouziLoading = false;
+        } else {
+            externalResults.style.display = 'grid';
+        }
 
         try {
-            const url = `http://www.qqtouxiangzhao.com/search?word=${encodeURIComponent(keyword)}`;
+            const limit = 50;
+            const url = `https://api.tangdouz.com/a/biaoq.php?return=json&nr=${encodeURIComponent(keyword)}`;
             const response = await fetch(url);
-            const html = await response.text();
+            const data = await response.json();
             
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(html, 'text/html');
-            
-            const images = [];
-            const imgElements = doc.querySelectorAll('img');
-            
-            imgElements.forEach(img => {
-                const src = img.getAttribute('src');
-                if (src && src.startsWith('http') && !src.includes('loading') && !src.includes('logo')) {
-                    images.push(src);
+            if (Array.isArray(data) && data.length > 0) {
+                this.currentTangdouziKeyword = keyword;
+                this.currentTangdouziPage = page;
+                
+                const imageUrls = data.map(item => item.thumbSrc);
+                
+                if (isFirstPage) {
+                    this.tangdouziResults = imageUrls;
+                    this.displayTangdouziResults(this.tangdouziResults, keyword, false);
+                } else {
+                    this.tangdouziResults = [...this.tangdouziResults, ...imageUrls];
+                    this.appendTangdouziResults(imageUrls, keyword);
                 }
-            });
-
-            if (images.length > 0) {
-                this.displayExternalResults(images, keyword);
+                
+                this.tangdouziHasMore = false;
+                this.tangdouziLoading = false;
             } else {
-                externalResults.innerHTML = '<p class="hint-text">未找到表情包，请尝试其他关键词</p>';
+                if (isFirstPage) {
+                    externalResults.innerHTML = '<p class="hint-text">未找到表情包，请尝试其他关键词</p>';
+                } else {
+                    this.tangdouziHasMore = false;
+                    this.tangdouziLoading = false;
+                    this.showMessage('没有更多表情包了', 'info');
+                }
             }
         } catch (error) {
             console.error('搜索失败:', error);
-            externalResults.innerHTML = '<p class="hint-text">搜索失败，请稍后重试</p>';
+            if (isFirstPage) {
+                externalResults.innerHTML = '<p class="hint-text">搜索失败，请稍后重试</p>';
+            }
             this.showMessage('搜索失败: ' + error.message, 'error');
+            this.tangdouziLoading = false;
+        }
+    }
+
+    displayTangdouziResults(images, keyword, hasMore) {
+        const externalResults = document.getElementById('externalResults');
+        externalResults.style.display = 'grid';
+        externalResults.innerHTML = images.map((imgUrl, index) => `
+            <div class="result-item" data-url="${imgUrl}">
+                <img src="${imgUrl}" alt="表情包" 
+                     onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iIzMzMyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIjc3NyIgPkltYWdlPC90ZXh0Pjwvc3ZnPg=='">
+                <button class="add-btn" onclick="emotionManager.addFromUrl('${imgUrl}', '${keyword}')">
+                    <i class="mdi mdi-plus"></i> 添加到我的
+                </button>
+            </div>
+        `).join('');
+        
+        if (hasMore) {
+            externalResults.innerHTML += `
+                <div class="load-more-container" style="grid-column: 1 / -1; text-align: center; padding: 20px;">
+                    <button class="btn btn-secondary" onclick="emotionManager.loadMoreTangdouzi()" style="padding: 10px 30px; font-size: 14px;">
+                        <i class="mdi mdi-chevron-down"></i> 加载更多
+                    </button>
+                </div>
+            `;
+        }
+    }
+
+    appendTangdouziResults(newImages, keyword) {
+        const externalResults = document.getElementById('externalResults');
+        const loadMoreContainer = externalResults.querySelector('.load-more-container');
+        if (loadMoreContainer) {
+            loadMoreContainer.remove();
+        }
+        
+        newImages.forEach(imgUrl => {
+            const div = document.createElement('div');
+            div.className = 'result-item';
+            div.dataset.url = imgUrl;
+            div.innerHTML = `
+                <img src="${imgUrl}" alt="表情包" 
+                     onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iIzMzMyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIjc3NyIgPkltYWdlPC90ZXh0Pjwvc3ZnPg=='">
+                <button class="add-btn" onclick="emotionManager.addFromUrl('${imgUrl}', '${keyword}')">
+                    <i class="mdi mdi-plus"></i> 添加到我的
+                </button>
+            `;
+            externalResults.appendChild(div);
+        });
+        
+        if (this.tangdouziHasMore) {
+            externalResults.innerHTML += `
+                <div class="load-more-container" style="grid-column: 1 / -1; text-align: center; padding: 20px;">
+                    <button class="btn btn-secondary" onclick="emotionManager.loadMoreTangdouzi()" style="padding: 10px 30px; font-size: 14px;">
+                        <i class="mdi mdi-chevron-down"></i> 加载更多
+                    </button>
+                </div>
+            `;
+        }
+    }
+
+    loadMoreTangdouzi() {
+        if (this.currentTangdouziKeyword && this.tangdouziHasMore && !this.tangdouziLoading) {
+            this.tangdouziLoading = true;
+            this.searchTangdouzi(this.currentTangdouziKeyword, this.currentTangdouziPage + 1);
         }
     }
 
@@ -971,19 +1114,22 @@ class EmotionManager {
         grid.style.display = 'grid';
         emptyState.style.display = 'none';
         
-        grid.innerHTML = emotions.map((emotion, index) => `
+        grid.innerHTML = emotions.map((emotion, index) => {
+            const imgSrc = this.getImageSrc(emotion);
+            return `
             <div class="emotion-card" data-index="${index}">
                 <div class="storage-icon ${emotion.storageType}">
                     <i class="mdi mdi-${emotion.storageType === 'cloud' ? 'cloud' : 'folder'}"></i>
                 </div>
-                <img src="${emotion.url}" alt="表情包" 
+                <img src="${imgSrc}" alt="表情包" 
+                     data-emotion-index="${index}"
                      onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iIzMzMyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIjc3NyIgPkltYWdlPC90ZXh0Pjwvc3ZnPg=='">
                 <div class="tags">
                     ${emotion.tags.slice(0, 3).map(tag => `<span class="tag">${tag}</span>`).join('')}
                     ${emotion.tags.length > 3 ? `<span class="tag">+${emotion.tags.length - 3}</span>` : ''}
                 </div>
             </div>
-        `).join('');
+        `}).join('');
 
         grid.querySelectorAll('.emotion-card').forEach(card => {
             card.addEventListener('click', () => {
@@ -991,6 +1137,38 @@ class EmotionManager {
                 this.showEmotionDetail(this.emotions[index]);
             });
         });
+
+        // 处理 uTools 存储的图片
+        grid.querySelectorAll('img[data-emotion-index]').forEach(img => {
+            const index = parseInt(img.dataset.emotionIndex);
+            const emotion = this.emotions[index];
+            if (emotion && emotion.url && emotion.url.startsWith('utools://')) {
+                this.loadUtoolsImage(emotion, img);
+            }
+        });
+    }
+
+    getImageSrc(emotion) {
+        // 如果是 uTools 存储的图片，先返回占位符，再异步加载
+        if (emotion.url && emotion.url.startsWith('utools://')) {
+            return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iIzMzMyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIzk5OSI+57qn5LmGPC90ZXh0Pjwvc3ZnPg==';
+        }
+        return emotion.url;
+    }
+
+    async loadUtoolsImage(emotion, imgElement) {
+        try {
+            if (emotion.url && emotion.url.startsWith('utools://')) {
+                const fileId = emotion.url.replace('utools://', '');
+                const fileData = await utools.db.get(fileId);
+                
+                if (fileData && fileData.data) {
+                    imgElement.src = fileData.data;
+                }
+            }
+        } catch (error) {
+            console.error('加载 uTools 图片失败:', error);
+        }
     }
 
     renderLocalView() {
@@ -1009,10 +1187,12 @@ class EmotionManager {
         
         grid.innerHTML = localEmotions.map((emotion, idx) => {
             const originalIndex = this.emotions.indexOf(emotion);
+            const imgSrc = this.getImageSrc(emotion);
             return `
                 <div class="emotion-card" data-index="${originalIndex}">
                     <div class="storage-icon local"><i class="mdi mdi-folder"></i></div>
-                    <img src="${emotion.url}" alt="表情包" 
+                    <img src="${imgSrc}" alt="表情包" 
+                         data-emotion-index="${originalIndex}"
                          onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iIzMzMyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIjc3NyIgPkltYWdlPC90ZXh0Pjwvc3ZnPg=='">
                     <div class="tags">
                         ${emotion.tags.slice(0, 3).map(tag => `<span class="tag">${tag}</span>`).join('')}
@@ -1027,6 +1207,15 @@ class EmotionManager {
                 const index = parseInt(card.dataset.index);
                 this.showEmotionDetail(this.emotions[index]);
             });
+        });
+
+        // 处理 uTools 存储的图片
+        grid.querySelectorAll('img[data-emotion-index]').forEach(img => {
+            const index = parseInt(img.dataset.emotionIndex);
+            const emotion = this.emotions[index];
+            if (emotion && emotion.url && emotion.url.startsWith('utools://')) {
+                this.loadUtoolsImage(emotion, img);
+            }
         });
     }
 
@@ -1046,10 +1235,12 @@ class EmotionManager {
         
         grid.innerHTML = cloudEmotions.map((emotion) => {
             const originalIndex = this.emotions.indexOf(emotion);
+            const imgSrc = this.getImageSrc(emotion);
             return `
                 <div class="emotion-card" data-index="${originalIndex}">
                     <div class="storage-icon cloud"><i class="mdi mdi-cloud"></i></div>
-                    <img src="${emotion.url}" alt="表情包" 
+                    <img src="${imgSrc}" alt="表情包" 
+                         data-emotion-index="${originalIndex}"
                          onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iIzMzMyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIjc3NyIgPkltYWdlPC90ZXh0Pjwvc3ZnPg=='">
                     <div class="tags">
                         ${emotion.tags.slice(0, 3).map(tag => `<span class="tag">${tag}</span>`).join('')}
@@ -1064,6 +1255,15 @@ class EmotionManager {
                 const index = parseInt(card.dataset.index);
                 this.showEmotionDetail(this.emotions[index]);
             });
+        });
+
+        // 处理 uTools 存储的图片
+        grid.querySelectorAll('img[data-emotion-index]').forEach(img => {
+            const index = parseInt(img.dataset.emotionIndex);
+            const emotion = this.emotions[index];
+            if (emotion && emotion.url && emotion.url.startsWith('utools://')) {
+                this.loadUtoolsImage(emotion, img);
+            }
         });
     }
 
@@ -1097,10 +1297,26 @@ class EmotionManager {
         this.renderEmotions(filtered);
     }
 
-    showEmotionDetail(emotion) {
+    async showEmotionDetail(emotion) {
         this.currentEmotion = emotion;
         
-        document.getElementById('modalImage').src = emotion.url;
+        const modalImage = document.getElementById('modalImage');
+        
+        // 处理 uTools 存储的图片
+        if (emotion.url && emotion.url.startsWith('utools://')) {
+            try {
+                const fileId = emotion.url.replace('utools://', '');
+                const fileData = await utools.db.get(fileId);
+                
+                if (fileData && fileData.data) {
+                    modalImage.src = fileData.data;
+                }
+            } catch (error) {
+                console.error('加载 uTools 图片失败:', error);
+            }
+        } else {
+            modalImage.src = emotion.url;
+        }
         
         const badge = document.getElementById('storageBadge');
         badge.className = `storage-badge ${emotion.storageType}`;
@@ -1120,16 +1336,39 @@ class EmotionManager {
         if (!this.currentEmotion) return;
         
         try {
-            const response = await fetch(this.currentEmotion.url);
-            const blob = await response.blob();
+            let blob;
             
-            await navigator.clipboard.write([
-                new ClipboardItem({
-                    [blob.type]: blob
-                })
-            ]);
+            // 处理 uTools 存储的图片
+            if (this.currentEmotion.url && this.currentEmotion.url.startsWith('utools://')) {
+                const fileId = this.currentEmotion.url.replace('utools://', '');
+                const fileData = await utools.db.get(fileId);
+                
+                if (fileData && fileData.data) {
+                    // 将 base64 转换为 blob
+                    const base64Data = fileData.data.split(',')[1];
+                    const contentType = fileData.fileType || 'image/png';
+                    const byteCharacters = atob(base64Data);
+                    const byteNumbers = new Array(byteCharacters.length);
+                    for (let i = 0; i < byteCharacters.length; i++) {
+                        byteNumbers[i] = byteCharacters.charCodeAt(i);
+                    }
+                    const byteArray = new Uint8Array(byteNumbers);
+                    blob = new Blob([byteArray], { type: contentType });
+                }
+            } else {
+                const response = await fetch(this.currentEmotion.url);
+                blob = await response.blob();
+            }
             
-            this.showMessage('已复制到剪贴板', 'success');
+            if (blob) {
+                await navigator.clipboard.write([
+                    new ClipboardItem({
+                        [blob.type]: blob
+                    })
+                ]);
+                
+                this.showMessage('已复制到剪贴板', 'success');
+            }
         } catch (error) {
             console.error('复制失败:', error);
             try {
@@ -1397,12 +1636,51 @@ class EmotionManager {
     async uploadToCloud(file) {
         const provider = this.settings.cloudProvider;
         
-        if (provider === 'imgbb') {
+        if (provider === 'utools') {
+            return await this.uploadToUtools(file);
+        } else if (provider === 'imgbb') {
             return await this.uploadToImgBB(file);
         } else if (provider === 'smms') {
             return await this.uploadToSMMS(file);
         } else {
             throw new Error('请先配置云存储');
+        }
+    }
+
+    async uploadToUtools(file) {
+        try {
+            console.log('开始上传到 uTools 存储');
+            
+            // 检查 uTools 环境
+            if (typeof utools === 'undefined') {
+                throw new Error('非 uTools 环境，无法使用 uTools 存储');
+            }
+
+            // 生成唯一的文件名
+            const fileExt = file.name.split('.').pop();
+            const fileName = `emotion_${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+            
+            // 将文件转换为 Base64
+            const base64Data = await this.fileToBase64(file);
+            
+            // 存储到 uTools 数据库
+            const fileId = `utools_file_${fileName}`;
+            await utools.db.put({
+                _id: fileId,
+                fileName: fileName,
+                fileType: file.type,
+                fileSize: file.size,
+                data: base64Data,
+                uploadTime: new Date().toISOString()
+            });
+            
+            console.log('文件上传到 uTools 存储成功:', fileName);
+            
+            // 返回访问 URL
+            return `utools://${fileId}`;
+        } catch (error) {
+            console.error('上传到 uTools 存储失败:', error);
+            throw new Error('上传到 uTools 存储失败: ' + error.message);
         }
     }
 
@@ -1482,7 +1760,10 @@ class EmotionManager {
         const provider = this.settings.cloudProvider;
         if (!provider) return false;
         
-        if (provider === 'imgbb') {
+        if (provider === 'utools') {
+            // uTools 内置存储不需要额外配置
+            return true;
+        } else if (provider === 'imgbb') {
             return this.settings.cloudConfig && this.settings.cloudConfig.imgbbApiKey && this.settings.cloudConfig.imgbbApiKey.trim() !== '';
         } else if (provider === 'smms') {
             return this.settings.cloudConfig && this.settings.cloudConfig.smmsToken && this.settings.cloudConfig.smmsToken.trim() !== '';
@@ -1532,21 +1813,26 @@ class EmotionManager {
     }
 
     loadSettingsToForm() {
-        const themePreference = this.themeManager.getUserPreference();
+        console.log('加载设置到表单，当前 settings:', this.settings);
+        
+        // 加载主题设置
+        const themePreference = this.settings.themePreference || this.themeManager.getUserPreference();
         const themeRadio = document.querySelector(`input[name="theme"][value="${themePreference}"]`);
         if (themeRadio) {
             themeRadio.checked = true;
         }
 
-        document.getElementById('cloudProvider').value = this.settings.cloudProvider || 'imgbb';
-
-        if (!this.settings.localPath && window.emotionCan && typeof window.emotionCan.getDefaultDir === 'function') {
-            this.settings.localPath = window.emotionCan.getDefaultDir();
-        }
+        // 加载云存储设置，默认使用 uTools
+        document.getElementById('cloudProvider').value = this.settings.cloudProvider || 'utools';
+        
+        // 加载本地存储路径 - 直接使用保存的设置，不覆盖
         document.getElementById('localPath').value = this.settings.localPath || '';
-
+        console.log('设置本地路径到表单:', this.settings.localPath);
+        
+        // 加载同步设置
         document.getElementById('syncProvider').value = this.settings.syncConfig?.provider || 'none';
-
+        
+        // 加载云存储配置
         if (this.settings.cloudConfig) {
             document.getElementById('s3Endpoint').value = this.settings.cloudConfig.s3Endpoint || '';
             document.getElementById('s3AccessKey').value = this.settings.cloudConfig.s3AccessKey || '';
@@ -1558,21 +1844,32 @@ class EmotionManager {
             const smmsTokenInput = document.getElementById('smmsToken');
             if (smmsTokenInput) smmsTokenInput.value = this.settings.cloudConfig.smmsToken || '';
         }
-
+        
+        // 加载同步配置
         if (this.settings.syncConfig) {
             document.getElementById('webdavUrl').value = this.settings.syncConfig.webdavUrl || '';
             document.getElementById('webdavUsername').value = this.settings.syncConfig.webdavUsername || '';
             document.getElementById('webdavPassword').value = this.settings.syncConfig.webdavPassword || '';
             document.getElementById('gitRemote').value = this.settings.syncConfig.gitRemote || '';
         }
-
-        this.toggleCloudConfig(this.settings.cloudProvider || 'imgbb');
+        
+        // 切换相应的配置面板
+        this.toggleCloudConfig(this.settings.cloudProvider || 'utools');
         this.toggleSyncConfig(this.settings.syncConfig?.provider || 'none');
     }
 
-    saveSettingsFromForm() {
-        this.settings.cloudProvider = document.getElementById('cloudProvider').value;
-        this.settings.localPath = document.getElementById('localPath').value;
+    async saveSettingsFromForm() {
+        console.log('开始保存设置，从表单读取值...');
+        
+        // 从表单更新设置
+        const newCloudProvider = document.getElementById('cloudProvider').value;
+        const newLocalPath = document.getElementById('localPath').value;
+        
+        console.log('表单中的 cloudProvider:', newCloudProvider);
+        console.log('表单中的 localPath:', newLocalPath);
+        
+        this.settings.cloudProvider = newCloudProvider;
+        this.settings.localPath = newLocalPath;
         
         this.settings.cloudConfig = {
             s3Endpoint: document.getElementById('s3Endpoint').value.trim(),
@@ -1592,19 +1889,33 @@ class EmotionManager {
             gitRemote: document.getElementById('gitRemote').value.trim()
         };
         
-        this.saveSettings();
+        // 保存主题设置 - 从单选按钮获取
+        const selectedTheme = document.querySelector('input[name="theme"]:checked');
+        if (selectedTheme) {
+            this.settings.themePreference = selectedTheme.value;
+            this.themeManager.setUserPreference(selectedTheme.value);
+        }
+        
+        console.log('准备保存到数据库的 settings:', this.settings);
+        await this.saveSettings();
     }
 
     toggleCloudConfig(provider) {
         const s3Config = document.getElementById('s3Config');
         const imgbbConfig = document.getElementById('imgbbConfig');
         const smmsConfig = document.getElementById('smmsConfig');
+        const utoolsConfig = document.getElementById('utoolsConfig');
         
+        // 隐藏所有配置
         s3Config.style.display = 'none';
         imgbbConfig.style.display = 'none';
         smmsConfig.style.display = 'none';
+        utoolsConfig.style.display = 'none';
         
-        if (provider === 's3' || provider === 'github') {
+        // 根据选择显示对应的配置
+        if (provider === 'utools') {
+            utoolsConfig.style.display = 'block';
+        } else if (provider === 's3' || provider === 'github') {
             s3Config.style.display = 'block';
         } else if (provider === 'imgbb') {
             imgbbConfig.style.display = 'block';
