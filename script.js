@@ -1121,6 +1121,12 @@ class EmotionManager {
                 <div class="storage-icon ${emotion.storageType}">
                     <i class="mdi mdi-${emotion.storageType === 'cloud' ? 'cloud' : 'folder'}"></i>
                 </div>
+                <div class="copy-overlay">
+                    <button class="copy-btn" data-copy-index="${index}">
+                        <i class="mdi mdi-content-copy"></i>
+                        <span>复制</span>
+                    </button>
+                </div>
                 <img src="${imgSrc}" alt="表情包" 
                      data-emotion-index="${index}"
                      onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iIzMzMyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIjc3NyIgPkltYWdlPC90ZXh0Pjwvc3ZnPg=='">
@@ -1132,9 +1138,21 @@ class EmotionManager {
         `}).join('');
 
         grid.querySelectorAll('.emotion-card').forEach(card => {
-            card.addEventListener('click', () => {
-                const index = parseInt(card.dataset.index);
-                this.showEmotionDetail(this.emotions[index]);
+            const index = parseInt(card.dataset.index);
+            // 点击卡片查看详情
+            card.addEventListener('click', (e) => {
+                if (!e.target.closest('.copy-btn')) {
+                    this.showEmotionDetail(this.emotions[index]);
+                }
+            });
+        });
+
+        // 绑定复制按钮事件
+        grid.querySelectorAll('.copy-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const index = parseInt(btn.dataset.copyIndex);
+                this.copyEmotionImage(this.emotions[index]);
             });
         });
 
@@ -1191,6 +1209,12 @@ class EmotionManager {
             return `
                 <div class="emotion-card" data-index="${originalIndex}">
                     <div class="storage-icon local"><i class="mdi mdi-folder"></i></div>
+                    <div class="copy-overlay">
+                        <button class="copy-btn" data-copy-index="${originalIndex}">
+                            <i class="mdi mdi-content-copy"></i>
+                            <span>复制</span>
+                        </button>
+                    </div>
                     <img src="${imgSrc}" alt="表情包" 
                          data-emotion-index="${originalIndex}"
                          onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iIzMzMyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIjc3NyIgPkltYWdlPC90ZXh0Pjwvc3ZnPg=='">
@@ -1203,9 +1227,19 @@ class EmotionManager {
         }).join('');
 
         grid.querySelectorAll('.emotion-card').forEach(card => {
-            card.addEventListener('click', () => {
-                const index = parseInt(card.dataset.index);
-                this.showEmotionDetail(this.emotions[index]);
+            const index = parseInt(card.dataset.index);
+            card.addEventListener('click', (e) => {
+                if (!e.target.closest('.copy-btn')) {
+                    this.showEmotionDetail(this.emotions[index]);
+                }
+            });
+        });
+
+        grid.querySelectorAll('.copy-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const index = parseInt(btn.dataset.copyIndex);
+                this.copyEmotionImage(this.emotions[index]);
             });
         });
 
@@ -1239,6 +1273,12 @@ class EmotionManager {
             return `
                 <div class="emotion-card" data-index="${originalIndex}">
                     <div class="storage-icon cloud"><i class="mdi mdi-cloud"></i></div>
+                    <div class="copy-overlay">
+                        <button class="copy-btn" data-copy-index="${originalIndex}">
+                            <i class="mdi mdi-content-copy"></i>
+                            <span>复制</span>
+                        </button>
+                    </div>
                     <img src="${imgSrc}" alt="表情包" 
                          data-emotion-index="${originalIndex}"
                          onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iIzMzMyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIjc3NyIgPkltYWdlPC90ZXh0Pjwvc3ZnPg=='">
@@ -1251,9 +1291,19 @@ class EmotionManager {
         }).join('');
 
         grid.querySelectorAll('.emotion-card').forEach(card => {
-            card.addEventListener('click', () => {
-                const index = parseInt(card.dataset.index);
-                this.showEmotionDetail(this.emotions[index]);
+            const index = parseInt(card.dataset.index);
+            card.addEventListener('click', (e) => {
+                if (!e.target.closest('.copy-btn')) {
+                    this.showEmotionDetail(this.emotions[index]);
+                }
+            });
+        });
+
+        grid.querySelectorAll('.copy-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const index = parseInt(btn.dataset.copyIndex);
+                this.copyEmotionImage(this.emotions[index]);
             });
         });
 
@@ -1334,48 +1384,92 @@ class EmotionManager {
 
     async copyEmotionToClipboard() {
         if (!this.currentEmotion) return;
-        
+        await this.copyEmotionImage(this.currentEmotion);
+    }
+
+    async copyEmotionImage(emotion) {
         try {
-            let blob;
-            
             // 处理 uTools 存储的图片
-            if (this.currentEmotion.url && this.currentEmotion.url.startsWith('utools://')) {
-                const fileId = this.currentEmotion.url.replace('utools://', '');
+            if (emotion.url && emotion.url.startsWith('utools://')) {
+                const fileId = emotion.url.replace('utools://', '');
                 const fileData = await utools.db.get(fileId);
                 
                 if (fileData && fileData.data) {
-                    // 将 base64 转换为 blob
-                    const base64Data = fileData.data.split(',')[1];
-                    const contentType = fileData.fileType || 'image/png';
-                    const byteCharacters = atob(base64Data);
-                    const byteNumbers = new Array(byteCharacters.length);
-                    for (let i = 0; i < byteCharacters.length; i++) {
-                        byteNumbers[i] = byteCharacters.charCodeAt(i);
-                    }
-                    const byteArray = new Uint8Array(byteNumbers);
-                    blob = new Blob([byteArray], { type: contentType });
+                    // 使用 base64 数据创建临时图片并复制
+                    const img = new Image();
+                    img.src = fileData.data;
+                    
+                    // 等待图片加载完成
+                    await new Promise((resolve, reject) => {
+                        img.onload = resolve;
+                        img.onerror = reject;
+                    });
+                    
+                    // 创建 canvas 来绘制并复制
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+                    
+                    // 将 canvas 转为图片并复制
+                    const imageData = canvas.toDataURL('image/png');
+                    const tempImg = new Image();
+                    tempImg.src = imageData;
+                    
+                    await new Promise((resolve, reject) => {
+                        tempImg.onload = resolve;
+                        tempImg.onerror = reject;
+                    });
+                    
+                    utools.copyImage(imageData);
+                    this.showMessage('已复制到剪贴板', 'success');
+                    return;
                 }
-            } else {
-                const response = await fetch(this.currentEmotion.url);
-                blob = await response.blob();
             }
             
-            if (blob) {
-                await navigator.clipboard.write([
-                    new ClipboardItem({
-                        [blob.type]: blob
-                    })
-                ]);
-                
-                this.showMessage('已复制到剪贴板', 'success');
-            }
+            // 处理其他 URL 图片
+            const img = new Image();
+            // 使用跨域代理来避免 CORS 问题
+            img.crossOrigin = 'anonymous';
+            img.src = emotion.url;
+            
+            await new Promise((resolve, reject) => {
+                img.onload = resolve;
+                img.onerror = reject;
+            });
+            
+            // 使用 canvas 绘制并复制
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            
+            const imageData = canvas.toDataURL('image/png');
+            utools.copyImage(imageData);
+            this.showMessage('已复制到剪贴板', 'success');
+            
         } catch (error) {
-            console.error('复制失败:', error);
+            console.error('复制图片失败:', error);
+            
+            // 尝试备用方案：先下载再复制
             try {
-                utools.copyText(this.currentEmotion.url);
-                this.showMessage('URL已复制到剪贴板', 'success');
-            } catch (urlError) {
-                this.showMessage('复制失败', 'error');
+                if (emotion.url && !emotion.url.startsWith('utools://')) {
+                    const response = await fetch(emotion.url);
+                    const blob = await response.blob();
+                    const reader = new FileReader();
+                    
+                    reader.onload = async (e) => {
+                        const base64Data = e.target.result;
+                        utools.copyImage(base64Data);
+                        this.showMessage('已复制到剪贴板', 'success');
+                    };
+                    reader.readAsDataURL(blob);
+                }
+            } catch (fallbackError) {
+                console.error('备用方案也失败了:', fallbackError);
+                this.showMessage('复制失败，请重试', 'error');
             }
         }
     }
