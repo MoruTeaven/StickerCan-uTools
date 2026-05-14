@@ -68,6 +68,40 @@ body {
     padding: 0 12px 15px;
     border-bottom: 1px solid var(--border-color);
     margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    min-width: 0;
+}
+
+.user-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--border-color);
+    flex-shrink: 0;
+}
+
+.sidebar.collapsed .user-avatar,
+.sidebar.collapsed .user-nickname {
+    display: none;
+}
+
+.user-nickname {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .logo {
@@ -77,6 +111,13 @@ body {
     display: flex;
     align-items: center;
     gap: 8px;
+}
+
+.app-logo {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    object-fit: contain;
 }
 
 .logo .mdi {
@@ -195,7 +236,8 @@ body {
 .sidebar.collapsed .nav-text,
 .sidebar.collapsed .stat-label,
 .sidebar.collapsed .stat-number,
-.sidebar.collapsed .logo {
+.sidebar.collapsed .logo,
+.sidebar.collapsed .app-logo {
     display: none;
 }
 
@@ -903,9 +945,11 @@ body {
     justify-content: center;
 }
 
-.about-logo .mdi {
-    font-size: 48px;
-    color: var(--text-primary);
+.about-logo-img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    border-radius: 20px;
 }
 
 .about-card h2 {
@@ -1559,4 +1603,59 @@ body {
 
 .copy-btn .mdi {
     font-size: 20px;
+}
+
+/* 加载更多按钮样式 */
+.load-more-container {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 30px 20px;
+    margin-top: 10px;
+}
+
+.load-more-btn {
+    padding: 14px 40px;
+    border: 3px solid var(--accent-color);
+    border-radius: 12px;
+    background: var(--accent-color);
+    color: var(--inverse-text);
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.load-more-btn:hover {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+
+.load-more-btn:active {
+    transform: translateY(0) scale(0.98);
+}
+
+.load-more-btn .mdi {
+    font-size: 22px;
+}
+
+.load-more-btn.loading {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.load-more-btn.loading .mdi {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
 }

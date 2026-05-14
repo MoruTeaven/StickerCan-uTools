@@ -12,12 +12,13 @@
         <!-- 左侧边栏 -->
         <aside class="sidebar">
             <div class="sidebar-header">
-                <div class="header-top">
-                    <h1 class="logo"><i class="mdi mdi-inbox"></i> <span class="logo-text">表情罐头</span></h1>
-                    <button class="collapse-btn" id="sidebarCollapseBtn">
-                        <i class="mdi mdi-menu-left" id="collapseIcon"></i>
-                    </button>
+                <div class="user-info">
+                    <img id="userAvatar" src="logo.png" alt="头像" class="user-avatar">
+                    <span id="userNickname" class="user-nickname">表情罐头</span>
                 </div>
+                <button class="collapse-btn" id="sidebarCollapseBtn">
+                    <i class="mdi mdi-menu-left" id="collapseIcon"></i>
+                </button>
             </div>
 
             <nav class="sidebar-nav">
@@ -29,10 +30,10 @@
                     <span class="nav-icon mdi mdi-folder"></span>
                     <span class="nav-text">本地表情</span>
                 </button>
-                <!-- <button class="nav-item" data-view="cloud">
+                <button class="nav-item" data-view="cloud">
                     <span class="nav-icon mdi mdi-cloud"></span>
                     <span class="nav-text">云端表情</span>
-                </button>-->
+                </button>
             </nav>
 
             <div class="sidebar-stats">
@@ -227,7 +228,7 @@
                         </div>
 
                         <!-- 云端存储设置 -->
-                        <!-- <div id="settingsCloud" class="settings-panel">
+                        <div id="settingsCloud" class="settings-panel">
                             <div class="settings-panel-header">
                                 <h3><i class="mdi mdi-cloud-upload"></i> 云端存储</h3>
                                 <p class="settings-panel-desc">配置图床服务，用于上传和存储表情包</p>
@@ -337,10 +338,10 @@
                                     </button>
                                 </div>
                             </div>
-                        </div-->
+                        </div>
 
                         <!-- 同步设置 -->
-                        <!-- <div id="settingsSync" class="settings-panel">
+                        <div id="settingsSync" class="settings-panel">
                             <div class="settings-panel-header">
                                 <h3><i class="mdi mdi-sync"></i> 同步设置</h3>
                                 <p class="settings-panel-desc">配置多设备数据同步功能</p>
@@ -472,7 +473,7 @@
                             <div class="settings-panel-body">
                                 <div class="about-card">
                                     <div class="about-logo">
-                                        <i class="mdi mdi-inbox"></i>
+                                        <img src="logo.png" alt="表情罐头" class="about-logo-img">
                                     </div>
                                     <h2>表情罐头</h2>
                                     <p class="about-version">版本 1.0.0</p>
@@ -611,6 +612,12 @@
         </div>
     </div>
 
+    <script src="theme-manager.js"></script>
+    <script src="data-manager.js"></script>
+    <script src="search-manager.js"></script>
+    <script src="ui-manager.js"></script>
+    <script src="storage-manager.js"></script>
+    <script src="emotion-manager.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
