@@ -52,10 +52,14 @@ class EmotionManager {
         
         if (this.isLightMode) {
             body.classList.add('light-mode');
-            themeBtn.innerHTML = '<i class="mdi mdi-weather-night"></i>';
+            if (themeBtn) {
+                themeBtn.innerHTML = '<i class="mdi mdi-weather-night"></i>';
+            }
         } else {
             body.classList.remove('light-mode');
-            themeBtn.innerHTML = '<i class="mdi mdi-weather-sunny"></i>';
+            if (themeBtn) {
+                themeBtn.innerHTML = '<i class="mdi mdi-weather-sunny"></i>';
+            }
         }
     }
 
@@ -112,20 +116,32 @@ class EmotionManager {
         });
 
         const searchInput = document.getElementById('searchInput');
-        searchInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                this.searchManager.handleSearch();
-            }
-        });
-        searchInput.addEventListener('input', (e) => {
-            if (this.currentTab === 'mine') {
-                this.searchManager.searchEmotions(e.target.value);
-            }
-        });
+        if (searchInput) {
+            searchInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    this.searchManager.handleSearch();
+                }
+            });
+            searchInput.addEventListener('input', (e) => {
+                if (this.currentTab === 'mine') {
+                    this.searchManager.searchEmotions(e.target.value);
+                }
+            });
+        }
 
-        document.getElementById('addBtn').addEventListener('click', () => {
-            this.showModal('addModal');
-        });
+        const searchBtn = document.getElementById('searchBtn');
+        if (searchBtn) {
+            searchBtn.addEventListener('click', () => {
+                this.searchManager.handleSearch();
+            });
+        }
+
+        const addBtn = document.getElementById('addBtn');
+        if (addBtn) {
+            addBtn.addEventListener('click', () => {
+                this.showModal('addModal');
+            });
+        }
 
         document.querySelectorAll('.close').forEach(closeBtn => {
             closeBtn.addEventListener('click', (e) => {
@@ -147,71 +163,90 @@ class EmotionManager {
                 btn.classList.add('active');
                 this.storageManager.selectedStorage = btn.dataset.storage;
                 this.storageManager.updateStorageHint();
+                const activeSourceTab = document.querySelector('.source-tab.active');
+                const sourceType = activeSourceTab ? activeSourceTab.dataset.source : 'url';
+                this.updateAddEmotionButtonText(sourceType);
             });
         });
 
-        document.getElementById('addUrlBtn').addEventListener('click', () => {
-            this.addEmotionFromUrl();
-        });
-
-        document.getElementById('uploadBtn').addEventListener('click', () => {
-            this.uploadAndAddEmotion();
-        });
-
-        document.getElementById('addTagBtn').addEventListener('click', () => {
-            this.uiManager.addTagInput();
-        });
-
-        document.getElementById('copyBtn').addEventListener('click', () => {
-            this.copyEmotionToClipboard();
-        });
-
-        document.getElementById('editTagsBtn').addEventListener('click', () => {
-            this.toggleEditMode();
-        });
-
-        document.getElementById('deleteBtn').addEventListener('click', () => {
-            this.deleteCurrentEmotion();
-        });
-
-        document.getElementById('tagInput').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                this.saveTags();
-            }
-        });
-
-        document.getElementById('saveSettingsBtn').addEventListener('click', async () => {
-            await this.saveSettingsFromForm();
-        });
-
-        document.getElementById('testConnectionBtn').addEventListener('click', () => {
-            this.testCloudConnection();
-        });
-
-        document.getElementById('cloudProvider').addEventListener('change', (e) => {
-            this.toggleCloudConfig(e.target.value);
-        });
-
-        document.getElementById('syncProvider').addEventListener('change', (e) => {
-            this.toggleSyncConfig(e.target.value);
-        });
-
-        document.querySelectorAll('input[name="theme"]').forEach(radio => {
-            radio.addEventListener('change', (e) => {
-                this.themeManager.setUserPreference(e.target.value);
+        const addTagBtn = document.getElementById('addTagBtn');
+        if (addTagBtn) {
+            addTagBtn.addEventListener('click', () => {
+                this.uiManager.addTagInput();
             });
-        });
+        }
 
-        document.querySelectorAll('.settings-nav-item').forEach(item => {
-            item.addEventListener('click', () => {
-                const settingsType = item.dataset.settings;
-                this.switchSettingsPanel(settingsType);
+        const addEmotionBtn = document.getElementById('addEmotionBtn');
+        if (addEmotionBtn) {
+            addEmotionBtn.addEventListener('click', () => {
+                this.handleAddEmotion();
             });
-        });
+        }
 
-        document.getElementById('selectFolderBtn').addEventListener('click', () => {
-            this.storageManager.selectLocalFolder();
-        });
+        const copyBtn = document.getElementById('copyBtn');
+        if (copyBtn) {
+            copyBtn.addEventListener('click', () => {
+                this.copyEmotionToClipboard();
+            });
+        }
+
+        const editTagsBtn = document.getElementById('editTagsBtn');
+        if (editTagsBtn) {
+            editTagsBtn.addEventListener('click', () => {
+                this.toggleEditMode();
+            });
+        }
+
+        const deleteBtn = document.getElementById('deleteBtn');
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', () => {
+                this.deleteCurrentEmotion();
+            });
+        }
+
+        const tagInput = document.getElementById('tagInput');
+        if (tagInput) {
+            tagInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    this.saveTags();
+                }
+            });
+        }
+
+        const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+        if (saveSettingsBtn) {
+            saveSettingsBtn.addEventListener('click', async () => {
+                await this.saveSettingsFromForm();
+            });
+        }
+
+        const testConnectionBtn = document.getElementById('testConnectionBtn');
+        if (testConnectionBtn) {
+            testConnectionBtn.addEventListener('click', () => {
+                this.testCloudConnection();
+            });
+        }
+
+        const cloudProvider = document.getElementById('cloudProvider');
+        if (cloudProvider) {
+            cloudProvider.addEventListener('change', (e) => {
+                this.toggleCloudConfig(e.target.value);
+            });
+        }
+
+        const syncProvider = document.getElementById('syncProvider');
+        if (syncProvider) {
+            syncProvider.addEventListener('change', (e) => {
+                this.toggleSyncConfig(e.target.value);
+            });
+        }
+
+        const selectFolderBtn = document.getElementById('selectFolderBtn');
+        if (selectFolderBtn) {
+            selectFolderBtn.addEventListener('click', () => {
+                this.storageManager.selectLocalFolder();
+            });
+        }
         
         console.log('setupEventListeners() 完成');
     }
@@ -285,21 +320,22 @@ class EmotionManager {
         grid.style.display = 'grid';
         emptyState.style.display = 'none';
         
-        grid.innerHTML = emotions.map((emotion, index) => {
+        grid.innerHTML = emotions.map((emotion) => {
+            const originalIndex = this.dataManager.emotions.indexOf(emotion);
             const imgSrc = this.storageManager.getImageSrc(emotion);
             return `
-            <div class="emotion-card" data-index="${index}">
+            <div class="emotion-card" data-index="${originalIndex}">
                 <div class="storage-icon ${emotion.storageType}">
                     <i class="mdi mdi-${emotion.storageType === 'cloud' ? 'cloud' : 'folder'}"></i>
                 </div>
                 <div class="copy-overlay">
-                    <button class="copy-btn" data-copy-index="${index}">
+                    <button class="copy-btn" data-copy-index="${originalIndex}">
                         <i class="mdi mdi-content-copy"></i>
                         <span>复制</span>
                     </button>
                 </div>
                 <img src="${imgSrc}" alt="表情包" 
-                     data-emotion-index="${index}"
+                     data-emotion-index="${originalIndex}"
                      onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iIzMzMyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIzk5OSI+57qn5LmGPC90ZXh0Pjwvc3ZnPg=='">
                 <div class="tags">
                     ${emotion.tags.slice(0, 3).map(tag => `<span class="tag">${tag}</span>`).join('')}
@@ -482,14 +518,24 @@ class EmotionManager {
         
         const badge = document.getElementById('storageBadge');
         badge.className = `storage-badge ${emotion.storageType}`;
-        badge.innerHTML = `
-            <i class="mdi mdi-${emotion.storageType === 'cloud' ? 'cloud' : 'folder'}"></i>
-            <span class="badge-text">${emotion.storageType === 'cloud' ? '云端存储' : '本地存储'}</span>
-        `;
+        const badgeIcon = badge.querySelector('.badge-icon');
+        const badgeText = badge.querySelector('.badge-text');
+        
+        if (badgeIcon) {
+            badgeIcon.className = `mdi mdi-${emotion.storageType === 'cloud' ? 'cloud' : 'folder'}`;
+        }
+        if (badgeText) {
+            badgeText.textContent = emotion.storageType === 'cloud' ? '云端存储' : '本地存储';
+        }
         
         document.getElementById('tagList').innerHTML = emotion.tags.map(tag => 
-            `<span class="tag">${tag}</span>`
+            `<span class="tag">${this.escapeHtml(tag)}</span>`
         ).join('');
+        
+        // 重置标签编辑器状态
+        document.getElementById('tagEditor').style.display = 'none';
+        document.getElementById('tagList').style.display = 'flex';
+        document.getElementById('editTagsBtn').innerHTML = '<i class="mdi mdi-tag"></i><span>编辑标签</span>';
         
         this.showModal('emotionModal');
     }
@@ -579,25 +625,96 @@ class EmotionManager {
 
     toggleEditMode() {
         const tagList = document.getElementById('tagList');
-        const tagInput = document.getElementById('tagInput');
+        const tagEditor = document.getElementById('tagEditor');
+        const tagInputContainer = document.getElementById('tagInputContainer');
+        const tagInputNew = document.getElementById('tagInputNew');
         const editBtn = document.getElementById('editTagsBtn');
         
-        if (tagInput.style.display === 'none') {
-            tagInput.style.display = 'block';
-            tagInput.value = this.currentEmotion.tags.join(', ');
-            tagInput.focus();
+        if (tagEditor.style.display === 'none') {
+            tagList.style.display = 'none';
+            tagEditor.style.display = 'block';
+            
+            tagInputContainer.innerHTML = this.currentEmotion.tags.map((tag, index) => `
+                <span class="tag" data-index="${index}" data-tag="${this.escapeHtml(tag)}">
+                    ${this.escapeHtml(tag)}
+                    <i class="mdi mdi-close remove-tag-btn" data-index="${index}"></i>
+                </span>
+            `).join('');
+            
+            tagInputContainer.querySelectorAll('.remove-tag-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const index = parseInt(e.target.dataset.index);
+                    this.removeTagFromEditor(index);
+                });
+            });
+            
+            tagInputNew.value = '';
+            tagInputNew.focus();
+            
+            tagInputNew.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.addTagFromInput();
+                }
+            });
+            
             editBtn.innerHTML = '<i class="mdi mdi-content-save"></i> 保存标签';
         } else {
             this.saveTags();
         }
     }
-
+    
+    removeTagFromEditor(index) {
+        const tagInputContainer = document.getElementById('tagInputContainer');
+        const tags = tagInputContainer.querySelectorAll('.tag');
+        
+        if (tags[index]) {
+            tags[index].remove();
+            
+            tagInputContainer.querySelectorAll('.tag').forEach((tag, i) => {
+                tag.dataset.index = i;
+                tag.querySelector('.remove-tag-btn').dataset.index = i;
+            });
+        }
+    }
+    
+    addTagFromInput() {
+        const tagInputNew = document.getElementById('tagInputNew');
+        const tagInputContainer = document.getElementById('tagInputContainer');
+        const newTag = tagInputNew.value.trim();
+        
+        if (newTag) {
+            const currentCount = tagInputContainer.querySelectorAll('.tag').length;
+            const tagElement = document.createElement('span');
+            tagElement.className = 'tag';
+            tagElement.dataset.index = currentCount;
+            tagElement.dataset.tag = this.escapeHtml(newTag);
+            tagElement.innerHTML = `
+                ${this.escapeHtml(newTag)}
+                <i class="mdi mdi-close remove-tag-btn" data-index="${currentCount}"></i>
+            `;
+            
+            tagElement.querySelector('.remove-tag-btn').addEventListener('click', (e) => {
+                const index = parseInt(e.target.dataset.index);
+                this.removeTagFromEditor(index);
+            });
+            
+            tagInputContainer.appendChild(tagElement);
+            tagInputNew.value = '';
+            tagInputNew.focus();
+        }
+    }
+    
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
     async saveTags() {
-        const tagInput = document.getElementById('tagInput');
-        const newTags = tagInput.value
-            .split(',')
-            .map(tag => tag.trim())
-            .filter(tag => tag.length > 0);
+        const tagInputContainer = document.getElementById('tagInputContainer');
+        const tagElements = tagInputContainer.querySelectorAll('.tag');
+        const newTags = Array.from(tagElements).map(tag => tag.dataset.tag || tag.textContent.trim());
         
         if (newTags.length === 0) {
             this.showMessage('至少需要一个标签', 'error');
@@ -611,12 +728,16 @@ class EmotionManager {
             await this.dataManager.saveData();
             this.renderAllViews();
             
-            document.getElementById('tagList').innerHTML = newTags.map(tag => 
-                `<span class="tag">${tag}</span>`
+            const tagList = document.getElementById('tagList');
+            tagList.innerHTML = newTags.map(tag => 
+                `<span class="tag">${this.escapeHtml(tag)}</span>`
             ).join('');
             
+            const tagEditor = document.getElementById('tagEditor');
+            tagEditor.style.display = 'none';
+            tagList.style.display = 'flex';
+            
             const editBtn = document.getElementById('editTagsBtn');
-            tagInput.style.display = 'none';
             editBtn.innerHTML = '<i class="mdi mdi-tag"></i> 编辑标签';
             this.showMessage('标签已更新', 'success');
         }
@@ -677,77 +798,14 @@ class EmotionManager {
         }
     }
 
-    async addEmotionFromUrl() {
+    async handleAddEmotion() {
         const urlInput = document.getElementById('imageUrl');
-        
+        const fileInput = document.getElementById('localImage');
         const url = urlInput.value.trim();
         const tags = this.uiManager.getTagsFromInputs();
         
-        if (!url) {
-            this.showMessage('请输入图片URL', 'error');
-            return;
-        }
-        
-        if (tags.length === 0) {
-            this.showMessage('请至少添加一个标签', 'error');
-            return;
-        }
-        
-        if (this.dataManager.emotions.some(e => e.url === url)) {
-            this.showMessage('该表情包已存在', 'error');
-            return;
-        }
-        
-        const configHint = this.storageManager.getConfigHint();
-        if (configHint) {
-            this.showMessage(configHint, 'error');
-            return;
-        }
-        
-        try {
-            const response = await fetch(url, { method: 'HEAD' });
-            if (!response.ok) {
-                throw new Error('图片URL无效');
-            }
-            
-            const contentType = response.headers.get('content-type');
-            if (!contentType || !contentType.startsWith('image/')) {
-                throw new Error('URL不是图片格式');
-            }
-        } catch (error) {
-            this.showMessage('图片URL验证失败: ' + error.message, 'error');
-            return;
-        }
-        
-        const emotion = {
-            id: this.dataManager.generateId(),
-            url: url,
-            storageType: this.storageManager.selectedStorage,
-            tags: tags,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-        };
-        
-        this.dataManager.emotions.push(emotion);
-        await this.dataManager.saveData();
-        this.renderAllViews();
-        this.hideModal('addModal');
-        
-        urlInput.value = '';
-        this.uiManager.resetTagsInputs();
-        
-        this.showMessage('表情包添加成功', 'success');
-    }
-
-    async uploadAndAddEmotion() {
-        const fileInput = document.getElementById('localImage');
-        
-        if (!fileInput.files[0]) {
-            this.showMessage('请选择要上传的图片', 'error');
-            return;
-        }
-        
-        const tags = this.uiManager.getTagsFromInputs();
+        const activeSourceTab = document.querySelector('.source-tab.active');
+        const sourceType = activeSourceTab ? activeSourceTab.dataset.source : 'url';
         
         if (tags.length === 0) {
             this.showMessage('请至少添加一个标签', 'error');
@@ -761,87 +819,166 @@ class EmotionManager {
         }
         
         try {
-            this.showMessage('正在处理...', 'info');
-            
-            let url;
-            
-            if (this.storageManager.selectedStorage === 'local') {
-                url = await this.storageManager.saveToLocal(fileInput.files[0]);
-            } else {
-                url = await this.storageManager.uploadToCloud(fileInput.files[0]);
-            }
-            
-            if (this.dataManager.emotions.some(e => e.url === url)) {
-                this.showMessage('该表情包已存在', 'error');
-                return;
-            }
-            
-            const emotion = {
-                id: this.dataManager.generateId(),
-                url: url,
-                storageType: this.storageManager.selectedStorage,
-                tags: tags,
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-                metadata: {
-                    originalName: fileInput.files[0].name,
-                    size: fileInput.files[0].size
+            if (sourceType === 'url') {
+                if (!url) {
+                    this.showMessage('请输入图片URL', 'error');
+                    return;
                 }
-            };
-            
-            this.dataManager.emotions.push(emotion);
-            await this.dataManager.saveData();
-            this.renderAllViews();
-            this.hideModal('addModal');
-            
-            fileInput.value = '';
-            this.uiManager.resetTagsInputs();
-            
-            this.showMessage('表情包上传成功', 'success');
+                
+                const response = await fetch(url, { method: 'HEAD' });
+                if (!response.ok) {
+                    throw new Error('图片URL无效');
+                }
+                
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.startsWith('image/')) {
+                    throw new Error('URL不是图片格式');
+                }
+                
+                this.showMessage('正在处理图片...', 'info');
+                
+                let finalUrl;
+                
+                if (this.storageManager.selectedStorage === 'local') {
+                    this.showMessage('正在下载图片到本地文件夹...', 'info');
+                    finalUrl = await this.storageManager.downloadAndSaveToLocal(url);
+                } else {
+                    this.showMessage('正在上传图片到云端...', 'info');
+                    finalUrl = await this.storageManager.uploadUrlToCloud(url);
+                }
+                
+                const emotion = {
+                    id: this.dataManager.generateId(),
+                    url: finalUrl,
+                    storageType: this.storageManager.selectedStorage,
+                    tags: tags,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                };
+                
+                this.dataManager.emotions.push(emotion);
+                await this.dataManager.saveData();
+                this.renderAllViews();
+                this.hideModal('addModal');
+                
+                urlInput.value = '';
+                this.uiManager.resetTagsInputs();
+                
+                this.showMessage('表情包添加成功', 'success');
+            } else {
+                if (!fileInput.files[0]) {
+                    this.showMessage('请选择要上传的图片', 'error');
+                    return;
+                }
+                
+                this.showMessage('正在处理...', 'info');
+                
+                let url;
+                
+                if (this.storageManager.selectedStorage === 'local') {
+                    url = await this.storageManager.saveToLocal(fileInput.files[0]);
+                } else {
+                    url = await this.storageManager.uploadToCloud(fileInput.files[0]);
+                }
+                
+                const emotion = {
+                    id: this.dataManager.generateId(),
+                    url: url,
+                    storageType: this.storageManager.selectedStorage,
+                    tags: tags,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    metadata: {
+                        originalName: fileInput.files[0].name,
+                        size: fileInput.files[0].size
+                    }
+                };
+                
+                this.dataManager.emotions.push(emotion);
+                await this.dataManager.saveData();
+                this.renderAllViews();
+                this.hideModal('addModal');
+                
+                fileInput.value = '';
+                this.uiManager.resetTagsInputs();
+                
+                this.showMessage('表情包上传成功', 'success');
+            }
         } catch (error) {
-            console.error('上传失败:', error);
-            this.showMessage('上传失败: ' + error.message, 'error');
+            console.error('添加表情包失败:', error);
+            this.showMessage('添加失败: ' + error.message, 'error');
         }
     }
 
     async saveSettingsFromForm() {
         console.log('开始保存设置，从表单读取值...');
-        
-        const newCloudProvider = document.getElementById('cloudProvider').value;
-        const newLocalPath = document.getElementById('localPath').value;
-        
-        console.log('表单中的 cloudProvider:', newCloudProvider);
-        console.log('表单中的 localPath:', newLocalPath);
-        
-        this.dataManager.settings.cloudProvider = newCloudProvider;
-        this.dataManager.settings.localPath = newLocalPath;
-        
-        this.dataManager.settings.cloudConfig = {
-            s3Endpoint: document.getElementById('s3Endpoint').value.trim(),
-            s3AccessKey: document.getElementById('s3AccessKey').value.trim(),
-            s3SecretKey: document.getElementById('s3SecretKey').value.trim(),
-            s3Bucket: document.getElementById('s3Bucket').value.trim(),
-            s3Region: document.getElementById('s3Region').value.trim(),
-            imgbbApiKey: document.getElementById('imgbbApiKey')?.value.trim() || '',
-            smmsToken: document.getElementById('smmsToken')?.value.trim() || ''
-        };
-        
-        this.dataManager.settings.syncConfig = {
-            provider: document.getElementById('syncProvider').value,
-            webdavUrl: document.getElementById('webdavUrl').value.trim(),
-            webdavUsername: document.getElementById('webdavUsername').value.trim(),
-            webdavPassword: document.getElementById('webdavPassword').value.trim(),
-            gitRemote: document.getElementById('gitRemote').value.trim()
-        };
-        
-        const selectedTheme = document.querySelector('input[name="theme"]:checked');
-        if (selectedTheme) {
-            this.dataManager.settings.themePreference = selectedTheme.value;
-            this.themeManager.setUserPreference(selectedTheme.value);
+
+        const saveBtn = document.getElementById('saveSettingsBtn');
+        const originalContent = saveBtn.innerHTML;
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<i class="mdi mdi-loading mdi-spin"></i> 保存中...';
+
+        try {
+            const newCloudProvider = document.getElementById('cloudProvider').value;
+            const newLocalPath = document.getElementById('localPath').value;
+
+            console.log('表单中的 cloudProvider:', newCloudProvider);
+            console.log('表单中的 localPath:', newLocalPath);
+
+            this.dataManager.settings.cloudProvider = newCloudProvider;
+            this.dataManager.settings.localPath = newLocalPath;
+
+            this.dataManager.settings.cloudConfig = {
+                s3Endpoint: document.getElementById('s3Endpoint').value.trim(),
+                s3AccessKey: document.getElementById('s3AccessKey').value.trim(),
+                s3SecretKey: document.getElementById('s3SecretKey').value.trim(),
+                s3Bucket: document.getElementById('s3Bucket').value.trim(),
+                s3Region: document.getElementById('s3Region').value.trim(),
+                imgbbApiKey: document.getElementById('imgbbApiKey')?.value.trim() || '',
+                smmsToken: document.getElementById('smmsToken')?.value.trim() || ''
+            };
+
+            this.dataManager.settings.syncConfig = {
+                provider: document.getElementById('syncProvider').value,
+                webdavUrl: document.getElementById('webdavUrl').value.trim(),
+                webdavUsername: document.getElementById('webdavUsername').value.trim(),
+                webdavPassword: document.getElementById('webdavPassword').value.trim(),
+                gitRemote: document.getElementById('gitRemote').value.trim()
+            };
+
+            const selectedTheme = document.querySelector('input[name="theme"]:checked');
+            if (selectedTheme) {
+                this.dataManager.settings.themePreference = selectedTheme.value;
+                this.themeManager.setUserPreference(selectedTheme.value);
+            }
+
+            console.log('准备保存到数据库的 settings:', this.dataManager.settings);
+            await this.dataManager.saveSettings();
+
+            saveBtn.innerHTML = '<i class="mdi mdi-check"></i> 已保存';
+            saveBtn.classList.add('btn-success');
+
+            setTimeout(() => {
+                saveBtn.innerHTML = originalContent;
+                saveBtn.classList.remove('btn-success');
+                saveBtn.disabled = false;
+            }, 2000);
+
+            this.showMessage('设置已保存', 'success');
+
+        } catch (error) {
+            console.error('保存设置失败:', error);
+            saveBtn.innerHTML = '<i class="mdi mdi-alert-circle"></i> 保存失败';
+            saveBtn.classList.add('btn-danger');
+
+            setTimeout(() => {
+                saveBtn.innerHTML = originalContent;
+                saveBtn.classList.remove('btn-danger');
+                saveBtn.disabled = false;
+            }, 2000);
+
+            this.showMessage('保存设置失败: ' + error.message, 'error');
         }
-        
-        console.log('准备保存到数据库的 settings:', this.dataManager.settings);
-        await this.dataManager.saveSettings();
     }
 
     async saveSettings() {
@@ -854,6 +991,25 @@ class EmotionManager {
 
     toggleSyncConfig(provider) {
         this.uiManager.toggleSyncConfig(provider);
+    }
+
+    updateAddEmotionButtonText(sourceType) {
+        const btnText = document.getElementById('addEmotionBtnText');
+        if (!btnText) return;
+        
+        if (sourceType === 'url') {
+            if (this.storageManager.selectedStorage === 'local') {
+                btnText.textContent = '下载到本地';
+            } else {
+                btnText.textContent = '上传到云端';
+            }
+        } else {
+            if (this.storageManager.selectedStorage === 'local') {
+                btnText.textContent = '保存到本地';
+            } else {
+                btnText.textContent = '上传到云端';
+            }
+        }
     }
 
     testCloudConnection() {

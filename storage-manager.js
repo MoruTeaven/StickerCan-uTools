@@ -38,11 +38,17 @@ class StorageManager {
             return settings.cloudConfig && settings.cloudConfig.imgbbApiKey && settings.cloudConfig.imgbbApiKey.trim() !== '';
         } else if (provider === 'smms') {
             return settings.cloudConfig && settings.cloudConfig.smmsToken && settings.cloudConfig.smmsToken.trim() !== '';
-        } else if (provider === 's3' || provider === 'github') {
+        } else if (provider === 's3') {
             return settings.cloudConfig && 
                    settings.cloudConfig.s3Endpoint && 
                    settings.cloudConfig.s3AccessKey && 
                    settings.cloudConfig.s3SecretKey && 
+                   settings.cloudConfig.s3Bucket;
+        } else if (provider === 'github') {
+            return settings.cloudConfig && 
+                   settings.cloudConfig.s3Endpoint &&
+                   settings.cloudConfig.s3AccessKey &&
+                   settings.cloudConfig.s3SecretKey &&
                    settings.cloudConfig.s3Bucket;
         }
         return false;
@@ -147,6 +153,10 @@ class StorageManager {
             return await this.uploadToImgbb(file);
         } else if (provider === 'smms') {
             return await this.uploadToSmms(file);
+        } else if (provider === 's3') {
+            return await this.uploadToS3(file);
+        } else if (provider === 'github') {
+            return await this.uploadToGithub(file);
         } else {
             throw new Error('请先配置云存储');
         }
@@ -230,6 +240,207 @@ class StorageManager {
             return data.data.url;
         } else {
             throw new Error(data.images || data.msg || '上传失败');
+        }
+    }
+
+    async uploadToS3(file) {
+        const config = this.emotionManager.dataManager.settings.cloudConfig;
+        if (!config.s3Endpoint || !config.s3AccessKey || !config.s3SecretKey || !config.s3Bucket) {
+            throw new Error('请先完整配置S3存储信息');
+        }
+        
+        const fileName = `emotions/${Date.now()}_${Math.random().toString(36).substr(2, 9)}_${file.name}`;
+        const base64Data = await this.fileToBase64(file);
+        const binaryData = atob(base64Data.split(',')[1]);
+        const arrayBuffer = new ArrayBuffer(binaryData.length);
+        const uint8Array = new Uint8Array(arrayBuffer);
+        for (let i = 0; i < binaryData.length; i++) {
+            uint8Array[i] = binaryData.charCodeAt(i);
+        }
+        
+        const host = config.s3Endpoint.replace(/^https?:\/\//, '');
+        const region = config.s3Region || 'us-east-1';
+        
+        const date = new Date().toISOString().replace(/[:-]|\.\d{3}/g, '');
+        const dateStamp = date.substr(0, 8);
+        const amzDate = date.substr(0, 8) + 'T' + date.substr(9, 6) + 'Z';
+        
+        const payloadHash = await this.hash256(arrayBuffer);
+        
+        const canonicalUri = '/' + fileName;
+        const canonicalQuerystring = '';
+        const canonicalHeaders = `host:${host}\nx-amz-content-sha256:${payloadHash}\nx-amz-date:${amzDate}\n`;
+        const signedHeaders = 'host;x-amz-content-sha256;x-amz-date';
+        
+        const canonicalRequest = [
+            'PUT',
+            canonicalUri,
+            canonicalQuerystring,
+            canonicalHeaders,
+            signedHeaders,
+            payloadHash
+        ].join('\n');
+        
+        const algorithm = 'AWS4-HMAC-SHA256';
+        const credentialScope = `${dateStamp}/${region}/s3/aws4_request`;
+        const stringToSign = [
+            algorithm,
+            amzDate,
+            credentialScope,
+            await this.hash256(canonicalRequest)
+        ].join('\n');
+        
+        const signingKey = await this.getSignatureKey(
+            config.s3SecretKey,
+            dateStamp,
+            region,
+            's3'
+        );
+        const signature = await this.hmacSha256(signingKey, stringToSign);
+        
+        const authHeader = `${algorithm} Credential=${config.s3AccessKey}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
+        
+        try {
+            const response = await fetch(`${config.s3Endpoint}/${fileName}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': authHeader,
+                    'Content-Type': file.type,
+                    'x-amz-content-sha256': payloadHash,
+                    'x-amz-date': amzDate
+                },
+                body: uint8Array
+            });
+            
+            if (response.ok || response.status === 200) {
+                const cdnUrl = config.s3Endpoint.replace(/\/$/, '');
+                return `${cdnUrl}/${fileName}`;
+            } else {
+                throw new Error(`S3上传失败: ${response.status} ${response.statusText}`);
+            }
+        } catch (error) {
+            console.error('S3上传失败:', error);
+            throw new Error('S3上传失败: ' + error.message);
+        }
+    }
+
+    async uploadToGithub(file) {
+        const config = this.emotionManager.dataManager.settings.cloudConfig;
+        if (!config.s3Endpoint || !config.s3AccessKey || !config.s3Bucket) {
+            throw new Error('请先配置GitHub仓库信息');
+        }
+        
+        const parts = config.s3Endpoint.split('/');
+        const owner = parts[parts.length - 2] || '';
+        const repo = parts[parts.length - 1] || '';
+        
+        const fileName = `emotions/${Date.now()}_${Math.random().toString(36).substr(2, 9)}_${file.name}`;
+        const filePath = (config.s3Region || 'main') + '/' + fileName;
+        
+        const base64Data = await this.fileToBase64(file);
+        const content = base64Data.split(',')[1];
+        
+        const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${filePath}`;
+        
+        try {
+            const response = await fetch(apiUrl, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `token ${config.s3AccessKey}`,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/vnd.github.v3+json'
+                },
+                body: JSON.stringify({
+                    message: `Upload emotion: ${file.name}`,
+                    content: content
+                })
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                const cdnBase = config.s3Bucket.replace(/\/$/, '') || 'https://cdn.jsdelivr.net/gh';
+                return `${cdnBase}/${owner}/${repo}/${filePath}`;
+            } else {
+                const errorData = await response.json();
+                throw new Error(errorData.message || `GitHub上传失败: ${response.status}`);
+            }
+        } catch (error) {
+            console.error('GitHub上传失败:', error);
+            throw new Error('GitHub上传失败: ' + error.message);
+        }
+    }
+
+    async hash256(message) {
+        let msgBuffer;
+        if (typeof message === 'string') {
+            msgBuffer = new TextEncoder().encode(message);
+        } else {
+            msgBuffer = message;
+        }
+        const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    async hmacSha256(key, message) {
+        const cryptoKey = await crypto.subtle.importKey(
+            'raw',
+            new TextEncoder().encode(key),
+            { name: 'HMAC', hash: 'SHA-256' },
+            false,
+            ['sign']
+        );
+        const signature = await crypto.subtle.sign(
+            'HMAC',
+            cryptoKey,
+            new TextEncoder().encode(message)
+        );
+        return Array.from(new Uint8Array(signature))
+            .map(b => b.toString(16).padStart(2, '0'))
+            .join('');
+    }
+
+    async getSignatureKey(key, dateStamp, region, service) {
+        const kDate = await this.hmacSha256('AWS4' + key, dateStamp);
+        const kRegion = await this.hmacSha256(kDate, region);
+        const kService = await this.hmacSha256(kRegion, service);
+        const kSigning = await this.hmacSha256(kService, 'aws4_request');
+        return kSigning;
+    }
+
+    async uploadUrlToCloud(imageUrl) {
+        const provider = this.emotionManager.dataManager.settings.cloudProvider;
+        
+        try {
+            const response = await fetch(imageUrl);
+            if (!response.ok) {
+                throw new Error('下载图片失败');
+            }
+            
+            const blob = await response.blob();
+            
+            const mimeType = blob.type || 'image/png';
+            const extension = this.getExtensionFromMimeType(mimeType);
+            const fileName = `emotion_${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${extension}`;
+            
+            const file = new File([blob], fileName, { type: mimeType });
+            
+            if (provider === 'utools') {
+                return await this.uploadToUtools(file);
+            } else if (provider === 'imgbb') {
+                return await this.uploadToImgbb(file);
+            } else if (provider === 'smms') {
+                return await this.uploadToSmms(file);
+            } else if (provider === 's3') {
+                return await this.uploadToS3(file);
+            } else if (provider === 'github') {
+                return await this.uploadToGithub(file);
+            } else {
+                throw new Error('请先配置云存储');
+            }
+        } catch (error) {
+            console.error('上传URL图片到云端失败:', error);
+            throw new Error('上传图片到云端失败: ' + error.message);
         }
     }
 

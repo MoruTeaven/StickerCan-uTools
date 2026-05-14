@@ -166,9 +166,13 @@ class UIManager {
         const cloudCount = this.emotionManager.dataManager.emotions.filter(e => e.storageType === 'cloud').length;
         const localCount = this.emotionManager.dataManager.emotions.filter(e => e.storageType === 'local').length;
         
-        document.getElementById('totalCount').textContent = total;
-        document.getElementById('cloudCount').textContent = cloudCount;
-        document.getElementById('localCount').textContent = localCount;
+        const totalEl = document.getElementById('totalCount');
+        const cloudEl = document.getElementById('cloudCount');
+        const localEl = document.getElementById('localCount');
+        
+        if (totalEl) totalEl.textContent = total;
+        if (cloudEl) cloudEl.textContent = cloudCount;
+        if (localEl) localEl.textContent = localCount;
     }
 
     addTagInput() {

@@ -96,6 +96,34 @@ document.addEventListener('DOMContentLoaded', () => {
         emotionManager.init();
         initUserInfo();
     }
+
+    // 添加表情包弹窗的标签页切换
+    const sourceTabs = document.querySelectorAll('.source-tab');
+    sourceTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            const source = tab.dataset.source;
+            
+            // 更新标签状态
+            sourceTabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            
+            // 显示对应内容
+            document.querySelectorAll('.source-content').forEach(content => {
+                content.style.display = 'none';
+            });
+            
+            if (source === 'url') {
+                document.querySelector('.url-source').style.display = 'block';
+            } else {
+                document.querySelector('.file-source').style.display = 'block';
+            }
+            
+            // 更新添加按钮文本
+            if (emotionManager && typeof emotionManager.updateAddEmotionButtonText === 'function') {
+                emotionManager.updateAddEmotionButtonText(source);
+            }
+        });
+    });
 });
 
 window.emotionManager = emotionManager;
