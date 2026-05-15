@@ -1,4 +1,24 @@
 class EmotionManager {
+    async fetchWithTimeout(url, options = {}, timeout = 30000) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeout);
+        
+        try {
+            const response = await fetch(url, {
+                ...options,
+                signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+            return response;
+        } catch (error) {
+            clearTimeout(timeoutId);
+            if (error.name === 'AbortError') {
+                throw new Error('请求超时，请检查网络连接');
+            }
+            throw error;
+        }
+    }
+
     constructor() {
         this.currentView = 'home';
         this.currentEmotion = null;
@@ -21,7 +41,18 @@ class EmotionManager {
         this.switchView('home');
         this.uiManager.initSidebarState();
         this.searchManager.setupInfiniteScroll();
+        this.initChangelog();
         console.log('EmotionManager.init() 完成');
+    }
+
+    initChangelog() {
+        if (window.changelogManager) {
+            const timeline = document.getElementById('changelogTimeline');
+            if (timeline) {
+                timeline.innerHTML = window.changelogManager.renderAll();
+                console.log('更新记录已加载');
+            }
+        }
     }
 
     loadTheme() {
@@ -247,8 +278,14 @@ class EmotionManager {
                 this.storageManager.selectLocalFolder();
             });
         }
+
+        const deleteLocalFileCheckbox = document.getElementById('deleteLocalFile');
+        if (deleteLocalFileCheckbox) {
+            deleteLocalFileCheckbox.addEventListener('change', async () => {
+                await this.saveDeleteLocalFileSetting();
+            });
+        }
         
-        // 处理外部链接点击事件
         document.querySelectorAll('[data-external-link="true"]').forEach(link => {
             link.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -294,7 +331,7 @@ class EmotionManager {
         console.log('renderView:', viewName);
         switch(viewName) {
             case 'home':
-                this.renderEmotions(this.dataManager.emotions);
+                this.renderEmotions(this.dataManager.getAllEmotions());
                 break;
             case 'local':
                 this.renderLocalView();
@@ -310,7 +347,7 @@ class EmotionManager {
     }
 
     renderAllViews() {
-        this.renderEmotions(this.dataManager.emotions);
+        this.renderEmotions(this.dataManager.getAllEmotions());
         this.renderLocalView();
         this.renderCloudView();
         this.uiManager.updateStats();
@@ -321,6 +358,10 @@ class EmotionManager {
         const grid = document.getElementById('emotionGrid');
         const externalResults = document.getElementById('externalResults');
         const emptyState = document.getElementById('emptyState');
+        
+        if (!grid || !externalResults || !emptyState) {
+            return;
+        }
         
         externalResults.style.display = 'none';
         
@@ -334,34 +375,37 @@ class EmotionManager {
         emptyState.style.display = 'none';
         
         grid.innerHTML = emotions.map((emotion) => {
-            const originalIndex = this.dataManager.emotions.indexOf(emotion);
             const imgSrc = this.storageManager.getImageSrc(emotion);
-            return `
-            <div class="emotion-card" data-index="${originalIndex}">
-                <div class="storage-icon ${emotion.storageType}">
-                    <i class="mdi mdi-${emotion.storageType === 'cloud' ? 'cloud' : 'folder'}"></i>
-                </div>
-                <div class="copy-overlay">
-                    <button class="copy-btn" data-copy-index="${originalIndex}">
-                        <i class="mdi mdi-content-copy"></i>
-                        <span>复制</span>
-                    </button>
-                </div>
-                <img src="${imgSrc}" alt="表情包" 
-                     data-emotion-index="${originalIndex}"
-                     onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iIzMzMyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIzk5OSI+57qn5LmGPC90ZXh0Pjwvc3ZnPg=='">
-                <div class="tags">
-                    ${emotion.tags.slice(0, 3).map(tag => `<span class="tag">${tag}</span>`).join('')}
-                    ${emotion.tags.length > 3 ? `<span class="tag">+${emotion.tags.length - 3}</span>` : ''}
-                </div>
-            </div>
-        `}).join('');
+            return '<div class="emotion-card" data-emotion-id="' + emotion.id + '">' +
+                '<div class="storage-icon ' + emotion.storageType + '">' +
+                    '<i class="mdi mdi-' + (emotion.storageType === 'cloud' ? 'cloud' : 'folder') + '"></i>' +
+                '</div>' +
+                '<div class="copy-overlay">' +
+                    '<button class="copy-btn" data-emotion-id="' + emotion.id + '">' +
+                        '<i class="mdi mdi-content-copy"></i>' +
+                        '<span>复制</span>' +
+                    '</button>' +
+                '</div>' +
+                '<img src="' + imgSrc + '" alt="表情包" ' +
+                     'data-emotion-id="' + emotion.id + '"' +
+                     'onerror="this.src=\'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iIzMzMyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIzc3NyIgPkltYWdlPC90ZXh0Pjwvc3ZnPg==\'">' +
+                '<div class="tags">' +
+                    emotion.tags.slice(0, 3).map(tag => '<span class="tag">' + tag + '</span>').join('') +
+                    (emotion.tags.length > 3 ? '<span class="tag">+' + (emotion.tags.length - 3) + '</span>' : '') +
+                '</div>' +
+            '</div>';
+        }).join('');
 
         grid.querySelectorAll('.emotion-card').forEach(card => {
-            const index = parseInt(card.dataset.index);
+            const emotionId = card.dataset.emotionId;
             card.addEventListener('click', (e) => {
                 if (!e.target.closest('.copy-btn')) {
-                    this.showEmotionDetail(this.dataManager.emotions[index]);
+                    const emotion = this.dataManager.findEmotionByUrl(
+                        card.querySelector('img').src.replace(window.location.origin + '/', '')
+                    ) || this.dataManager.getAllEmotions().find(e => e.id === emotionId);
+                    if (emotion) {
+                        this.showEmotionDetail(emotion);
+                    }
                 }
             });
         });
@@ -369,24 +413,23 @@ class EmotionManager {
         grid.querySelectorAll('.copy-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                const index = parseInt(btn.dataset.copyIndex);
-                this.copyEmotionImage(this.dataManager.emotions[index]);
+                const emotionId = btn.dataset.emotionId;
+                const emotion = this.dataManager.getAllEmotions().find(e => e.id === emotionId);
+                if (emotion) {
+                    this.copyEmotionImage(emotion);
+                }
             });
-        });
-
-        grid.querySelectorAll('img[data-emotion-index]').forEach(img => {
-            const index = parseInt(img.dataset.emotionIndex);
-            const emotion = this.dataManager.emotions[index];
-            if (emotion && emotion.url && emotion.url.startsWith('utools://')) {
-                this.storageManager.loadUtoolsImage(emotion, img);
-            }
         });
     }
 
     renderLocalView() {
         const grid = document.getElementById('localEmotionGrid');
         const emptyState = document.getElementById('localEmptyState');
-        const localEmotions = this.dataManager.emotions.filter(e => e.storageType === 'local');
+        const localEmotions = this.dataManager.emotions.local;
+        
+        if (!grid || !emptyState) {
+            return;
+        }
         
         if (localEmotions.length === 0) {
             grid.style.display = 'none';
@@ -398,33 +441,33 @@ class EmotionManager {
         emptyState.style.display = 'none';
         
         grid.innerHTML = localEmotions.map((emotion) => {
-            const originalIndex = this.dataManager.emotions.indexOf(emotion);
             const imgSrc = this.storageManager.getImageSrc(emotion);
-            return `
-                <div class="emotion-card" data-index="${originalIndex}">
-                    <div class="storage-icon local"><i class="mdi mdi-folder"></i></div>
-                    <div class="copy-overlay">
-                        <button class="copy-btn" data-copy-index="${originalIndex}">
-                            <i class="mdi mdi-content-copy"></i>
-                            <span>复制</span>
-                        </button>
-                    </div>
-                    <img src="${imgSrc}" alt="表情包" 
-                         data-emotion-index="${originalIndex}"
-                         onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iIzMzMyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIzk5OSI+57qn5LmGPC90ZXh0Pjwvc3ZnPg=='">
-                    <div class="tags">
-                        ${emotion.tags.slice(0, 3).map(tag => `<span class="tag">${tag}</span>`).join('')}
-                        ${emotion.tags.length > 3 ? `<span class="tag">+${emotion.tags.length - 3}</span>` : ''}
-                    </div>
-                </div>
-            `;
+            return '<div class="emotion-card" data-emotion-id="' + emotion.id + '">' +
+                '<div class="storage-icon local"><i class="mdi mdi-folder"></i></div>' +
+                '<div class="copy-overlay">' +
+                    '<button class="copy-btn" data-emotion-id="' + emotion.id + '">' +
+                        '<i class="mdi mdi-content-copy"></i>' +
+                        '<span>复制</span>' +
+                    '</button>' +
+                '</div>' +
+                '<img src="' + imgSrc + '" alt="表情包" ' +
+                     'data-emotion-id="' + emotion.id + '"' +
+                     'onerror="this.src=\'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iIzMzMyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIzc3NyIgPkltYWdlPC90ZXh0Pjwvc3ZnPg==\'">' +
+                '<div class="tags">' +
+                    emotion.tags.slice(0, 3).map(tag => '<span class="tag">' + tag + '</span>').join('') +
+                    (emotion.tags.length > 3 ? '<span class="tag">+' + (emotion.tags.length - 3) + '</span>' : '') +
+                '</div>' +
+            '</div>';
         }).join('');
 
         grid.querySelectorAll('.emotion-card').forEach(card => {
-            const index = parseInt(card.dataset.index);
+            const emotionId = card.dataset.emotionId;
             card.addEventListener('click', (e) => {
                 if (!e.target.closest('.copy-btn')) {
-                    this.showEmotionDetail(this.dataManager.emotions[index]);
+                    const emotion = this.dataManager.emotions.local.find(e => e.id === emotionId);
+                    if (emotion) {
+                        this.showEmotionDetail(emotion);
+                    }
                 }
             });
         });
@@ -432,24 +475,23 @@ class EmotionManager {
         grid.querySelectorAll('.copy-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                const index = parseInt(btn.dataset.copyIndex);
-                this.copyEmotionImage(this.dataManager.emotions[index]);
+                const emotionId = btn.dataset.emotionId;
+                const emotion = this.dataManager.emotions.local.find(e => e.id === emotionId);
+                if (emotion) {
+                    this.copyEmotionImage(emotion);
+                }
             });
-        });
-
-        grid.querySelectorAll('img[data-emotion-index]').forEach(img => {
-            const index = parseInt(img.dataset.emotionIndex);
-            const emotion = this.dataManager.emotions[index];
-            if (emotion && emotion.url && emotion.url.startsWith('utools://')) {
-                this.storageManager.loadUtoolsImage(emotion, img);
-            }
         });
     }
 
     renderCloudView() {
         const grid = document.getElementById('cloudEmotionGrid');
         const emptyState = document.getElementById('cloudEmptyState');
-        const cloudEmotions = this.dataManager.emotions.filter(e => e.storageType === 'cloud');
+        const cloudEmotions = this.dataManager.emotions.cloud;
+        
+        if (!grid || !emptyState) {
+            return;
+        }
         
         if (cloudEmotions.length === 0) {
             grid.style.display = 'none';
@@ -461,33 +503,33 @@ class EmotionManager {
         emptyState.style.display = 'none';
         
         grid.innerHTML = cloudEmotions.map((emotion) => {
-            const originalIndex = this.dataManager.emotions.indexOf(emotion);
             const imgSrc = this.storageManager.getImageSrc(emotion);
-            return `
-                <div class="emotion-card" data-index="${originalIndex}">
-                    <div class="storage-icon cloud"><i class="mdi mdi-cloud"></i></div>
-                    <div class="copy-overlay">
-                        <button class="copy-btn" data-copy-index="${originalIndex}">
-                            <i class="mdi mdi-content-copy"></i>
-                            <span>复制</span>
-                        </button>
-                    </div>
-                    <img src="${imgSrc}" alt="表情包" 
-                         data-emotion-index="${originalIndex}"
-                         onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iIzMzMyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIzk5OSI+57qn5LmGPC90ZXh0Pjwvc3ZnPg=='">
-                    <div class="tags">
-                        ${emotion.tags.slice(0, 3).map(tag => `<span class="tag">${tag}</span>`).join('')}
-                        ${emotion.tags.length > 3 ? `<span class="tag">+${emotion.tags.length - 3}</span>` : ''}
-                    </div>
-                </div>
-            `;
+            return '<div class="emotion-card" data-emotion-id="' + emotion.id + '">' +
+                '<div class="storage-icon cloud"><i class="mdi mdi-cloud"></i></div>' +
+                '<div class="copy-overlay">' +
+                    '<button class="copy-btn" data-emotion-id="' + emotion.id + '">' +
+                        '<i class="mdi mdi-content-copy"></i>' +
+                        '<span>复制</span>' +
+                    '</button>' +
+                '</div>' +
+                '<img src="' + imgSrc + '" alt="表情包" ' +
+                     'data-emotion-id="' + emotion.id + '"' +
+                     'onerror="this.src=\'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iIzMzMyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIzc3NyIgPkltYWdlPC90ZXh0Pjwvc3ZnPg==\'">' +
+                '<div class="tags">' +
+                    emotion.tags.slice(0, 3).map(tag => '<span class="tag">' + tag + '</span>').join('') +
+                    (emotion.tags.length > 3 ? '<span class="tag">+' + (emotion.tags.length - 3) + '</span>' : '') +
+                '</div>' +
+            '</div>';
         }).join('');
 
         grid.querySelectorAll('.emotion-card').forEach(card => {
-            const index = parseInt(card.dataset.index);
+            const emotionId = card.dataset.emotionId;
             card.addEventListener('click', (e) => {
                 if (!e.target.closest('.copy-btn')) {
-                    this.showEmotionDetail(this.dataManager.emotions[index]);
+                    const emotion = this.dataManager.emotions.cloud.find(e => e.id === emotionId);
+                    if (emotion) {
+                        this.showEmotionDetail(emotion);
+                    }
                 }
             });
         });
@@ -495,17 +537,12 @@ class EmotionManager {
         grid.querySelectorAll('.copy-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                const index = parseInt(btn.dataset.copyIndex);
-                this.copyEmotionImage(this.dataManager.emotions[index]);
+                const emotionId = btn.dataset.emotionId;
+                const emotion = this.dataManager.emotions.cloud.find(e => e.id === emotionId);
+                if (emotion) {
+                    this.copyEmotionImage(emotion);
+                }
             });
-        });
-
-        grid.querySelectorAll('img[data-emotion-index]').forEach(img => {
-            const index = parseInt(img.dataset.emotionIndex);
-            const emotion = this.dataManager.emotions[index];
-            if (emotion && emotion.url && emotion.url.startsWith('utools://')) {
-                this.storageManager.loadUtoolsImage(emotion, img);
-            }
         });
     }
 
@@ -513,39 +550,24 @@ class EmotionManager {
         this.currentEmotion = emotion;
         
         const modalImage = document.getElementById('modalImage');
-        
-        if (emotion.url && emotion.url.startsWith('utools://')) {
-            try {
-                const fileId = emotion.url.replace('utools://', '');
-                const fileData = await utools.db.get(fileId);
-                
-                if (fileData && fileData.data) {
-                    modalImage.src = fileData.data;
-                }
-            } catch (error) {
-                console.error('加载 uTools 图片失败:', error);
-            }
-        } else {
-            modalImage.src = emotion.url;
-        }
+        modalImage.src = emotion.url;
         
         const badge = document.getElementById('storageBadge');
-        badge.className = `storage-badge ${emotion.storageType}`;
+        badge.className = 'storage-badge ' + emotion.storageType;
         const badgeIcon = badge.querySelector('.badge-icon');
         const badgeText = badge.querySelector('.badge-text');
         
         if (badgeIcon) {
-            badgeIcon.className = `mdi mdi-${emotion.storageType === 'cloud' ? 'cloud' : 'folder'}`;
+            badgeIcon.className = 'mdi mdi-' + (emotion.storageType === 'cloud' ? 'cloud' : 'folder');
         }
         if (badgeText) {
             badgeText.textContent = emotion.storageType === 'cloud' ? '云端存储' : '本地存储';
         }
         
         document.getElementById('tagList').innerHTML = emotion.tags.map(tag => 
-            `<span class="tag">${this.escapeHtml(tag)}</span>`
+            '<span class="tag">' + this.escapeHtml(tag) + '</span>'
         ).join('');
         
-        // 重置标签编辑器状态
         document.getElementById('tagEditor').style.display = 'none';
         document.getElementById('tagList').style.display = 'flex';
         document.getElementById('editTagsBtn').innerHTML = '<i class="mdi mdi-tag"></i><span>编辑标签</span>';
@@ -559,48 +581,34 @@ class EmotionManager {
     }
 
     async copyEmotionImage(emotion) {
-        try {
-            if (emotion.url && emotion.url.startsWith('utools://')) {
-                const fileId = emotion.url.replace('utools://', '');
-                const fileData = await utools.db.get(fileId);
-                
-                if (fileData && fileData.data) {
-                    const img = new Image();
-                    img.src = fileData.data;
-                    
-                    await new Promise((resolve, reject) => {
-                        img.onload = resolve;
-                        img.onerror = reject;
-                    });
-                    
-                    const canvas = document.createElement('canvas');
-                    canvas.width = img.width;
-                    canvas.height = img.height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0);
-                    
-                    const imageData = canvas.toDataURL('image/png');
-                    const tempImg = new Image();
-                    tempImg.src = imageData;
-                    
-                    await new Promise((resolve, reject) => {
-                        tempImg.onload = resolve;
-                        tempImg.onerror = reject;
-                    });
-                    
-                    utools.copyImage(imageData);
-                    this.showMessage('已复制到剪贴板', 'success');
-                    return;
-                }
+        const getErrorMessage = (error) => {
+            if (error.name === 'AbortError' || error.message.includes('超时')) {
+                return '请求超时，请检查网络连接后重试';
             }
-            
+            if (error.message.includes('CORS') || error.message.includes('跨域')) {
+                return '图片存在跨域限制，无法复制';
+            }
+            if (error.message.includes('网络') || error.message.includes('network')) {
+                return '网络连接失败，请检查网络后重试';
+            }
+            return '复制失败: ' + (error.message || '请重试');
+        };
+
+        try {
             const img = new Image();
             img.crossOrigin = 'anonymous';
             img.src = emotion.url;
             
             await new Promise((resolve, reject) => {
-                img.onload = resolve;
-                img.onerror = reject;
+                const timeout = setTimeout(() => reject(new Error('图片加载超时')), 10000);
+                img.onload = () => {
+                    clearTimeout(timeout);
+                    resolve();
+                };
+                img.onerror = (err) => {
+                    clearTimeout(timeout);
+                    reject(new Error('图片加载失败'));
+                };
             });
             
             const canvas = document.createElement('canvas');
@@ -612,27 +620,39 @@ class EmotionManager {
             const imageData = canvas.toDataURL('image/png');
             utools.copyImage(imageData);
             this.showMessage('已复制到剪贴板', 'success');
+            return;
             
         } catch (error) {
-            console.error('复制图片失败:', error);
-            
-            try {
-                if (emotion.url && !emotion.url.startsWith('utools://')) {
-                    const response = await fetch(emotion.url);
-                    const blob = await response.blob();
-                    const reader = new FileReader();
-                    
-                    reader.onload = async (e) => {
-                        const base64Data = e.target.result;
-                        utools.copyImage(base64Data);
-                        this.showMessage('已复制到剪贴板', 'success');
-                    };
-                    reader.readAsDataURL(blob);
-                }
-            } catch (fallbackError) {
-                console.error('备用方案也失败了:', fallbackError);
-                this.showMessage('复制失败，请重试', 'error');
+            console.warn('Canvas 方案失败，尝试备用方案:', error);
+        }
+
+        try {
+            const response = await this.fetchWithTimeout(emotion.url);
+            if (!response.ok) {
+                throw new Error('HTTP ' + response.status);
             }
+            const blob = await response.blob();
+            const reader = new FileReader();
+            
+            reader.onload = (e) => {
+                try {
+                    utools.copyImage(e.target.result);
+                    this.showMessage('已复制到剪贴板', 'success');
+                } catch (copyError) {
+                    console.error('utools.copyImage 失败:', copyError);
+                    this.showMessage(getErrorMessage(copyError), 'error');
+                }
+            };
+            
+            reader.onerror = () => {
+                this.showMessage('图片解码失败，请重试', 'error');
+            };
+            
+            reader.readAsDataURL(blob);
+            
+        } catch (error) {
+            console.error('所有复制方案均失败:', error);
+            this.showMessage(getErrorMessage(error), 'error');
         }
     }
 
@@ -647,12 +667,12 @@ class EmotionManager {
             tagList.style.display = 'none';
             tagEditor.style.display = 'block';
             
-            tagInputContainer.innerHTML = this.currentEmotion.tags.map((tag, index) => `
-                <span class="tag" data-index="${index}" data-tag="${this.escapeHtml(tag)}">
-                    ${this.escapeHtml(tag)}
-                    <i class="mdi mdi-close remove-tag-btn" data-index="${index}"></i>
-                </span>
-            `).join('');
+            tagInputContainer.innerHTML = this.currentEmotion.tags.map((tag, index) => 
+                '<span class="tag" data-index="' + index + '" data-tag="' + this.escapeHtml(tag) + '">' +
+                    this.escapeHtml(tag) +
+                    '<i class="mdi mdi-close remove-tag-btn" data-index="' + index + '"></i>' +
+                '</span>'
+            ).join('');
             
             tagInputContainer.querySelectorAll('.remove-tag-btn').forEach(btn => {
                 btn.addEventListener('click', (e) => {
@@ -702,10 +722,9 @@ class EmotionManager {
             tagElement.className = 'tag';
             tagElement.dataset.index = currentCount;
             tagElement.dataset.tag = this.escapeHtml(newTag);
-            tagElement.innerHTML = `
-                ${this.escapeHtml(newTag)}
-                <i class="mdi mdi-close remove-tag-btn" data-index="${currentCount}"></i>
-            `;
+            tagElement.innerHTML = 
+                this.escapeHtml(newTag) +
+                '<i class="mdi mdi-close remove-tag-btn" data-index="' + currentCount + '"></i>';
             
             tagElement.querySelector('.remove-tag-btn').addEventListener('click', (e) => {
                 const index = parseInt(e.target.dataset.index);
@@ -734,40 +753,61 @@ class EmotionManager {
             return;
         }
         
-        const index = this.dataManager.emotions.findIndex(e => e.url === this.currentEmotion.url);
-        if (index !== -1) {
-            this.dataManager.emotions[index].tags = newTags;
-            this.currentEmotion.tags = newTags;
-            await this.dataManager.saveData();
-            this.renderAllViews();
-            
-            const tagList = document.getElementById('tagList');
-            tagList.innerHTML = newTags.map(tag => 
-                `<span class="tag">${this.escapeHtml(tag)}</span>`
-            ).join('');
-            
-            const tagEditor = document.getElementById('tagEditor');
-            tagEditor.style.display = 'none';
-            tagList.style.display = 'flex';
-            
-            const editBtn = document.getElementById('editTagsBtn');
-            editBtn.innerHTML = '<i class="mdi mdi-tag"></i> 编辑标签';
-            this.showMessage('标签已更新', 'success');
+        this.currentEmotion.tags = newTags;
+        
+        const updateEmotion = (arr) => {
+            const index = arr.findIndex(e => e.id === this.currentEmotion.id);
+            if (index !== -1) {
+                arr[index] = this.currentEmotion;
+                return true;
+            }
+            return false;
+        };
+        
+        if (!updateEmotion(this.dataManager.emotions.local)) {
+            updateEmotion(this.dataManager.emotions.cloud);
         }
+        
+        await this.dataManager.saveData();
+        this.renderAllViews();
+        
+        const tagList = document.getElementById('tagList');
+        tagList.innerHTML = newTags.map(tag => 
+            '<span class="tag">' + this.escapeHtml(tag) + '</span>'
+        ).join('');
+        
+        const tagEditor = document.getElementById('tagEditor');
+        tagEditor.style.display = 'none';
+        tagList.style.display = 'flex';
+        
+        const editBtn = document.getElementById('editTagsBtn');
+        editBtn.innerHTML = '<i class="mdi mdi-tag"></i> 编辑标签';
+        this.showMessage('标签已更新', 'success');
     }
 
     async deleteCurrentEmotion() {
         if (!this.currentEmotion) return;
         
         if (confirm('确定要删除这个表情包吗？')) {
-            const index = this.dataManager.emotions.findIndex(e => e.url === this.currentEmotion.url);
-            if (index !== -1) {
-                this.dataManager.emotions.splice(index, 1);
-                await this.dataManager.saveData();
-                this.renderAllViews();
-                this.hideModal('emotionModal');
-                this.showMessage('表情包已删除', 'success');
+            const emotionToDelete = this.currentEmotion;
+
+            if (this.dataManager.settings.deleteLocalFile && emotionToDelete.storageType === 'local') {
+                const filePath = emotionToDelete.url.replace('file://', '').replace(/\//g, '\\');
+                if (window.emotionCan && typeof window.emotionCan.deleteFile === 'function') {
+                    const deleted = window.emotionCan.deleteFile(filePath);
+                    if (deleted) {
+                        console.log('本地文件已删除:', filePath);
+                    } else {
+                        console.log('本地文件不存在或删除失败:', filePath);
+                    }
+                }
             }
+
+            this.dataManager.removeEmotion(emotionToDelete);
+            await this.dataManager.saveData();
+            this.renderAllViews();
+            this.hideModal('emotionModal');
+            this.showMessage('表情包已删除', 'success');
         }
     }
 
@@ -778,36 +818,112 @@ class EmotionManager {
             return;
         }
 
-        if (this.dataManager.emotions.some(e => e.url === url)) {
+        if (this.dataManager.getAllEmotions().some(e => e.url === url)) {
             this.showMessage('该表情包已存在', 'error');
             return;
         }
 
         try {
             let finalUrl = url;
+            const storageType = this.storageManager.selectedStorage;
             
-            if (this.storageManager.selectedStorage === 'local') {
+            if (storageType === 'local') {
                 this.showMessage('正在下载图片到本地...', 'info');
                 finalUrl = await this.storageManager.downloadAndSaveToLocal(url);
+            } else {
+                this.showMessage('正在上传图片到云端...', 'info');
+                finalUrl = await this.storageManager.uploadUrlToCloud(url);
             }
 
             const emotion = {
                 id: this.dataManager.generateId(),
                 url: finalUrl,
-                storageType: this.storageManager.selectedStorage,
+                storageType: storageType,
                 tags: [keyword],
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString()
             };
 
-            this.dataManager.emotions.push(emotion);
+            this.dataManager.addEmotion(emotion, storageType);
             await this.dataManager.saveData();
             this.switchTab('mine');
-            this.renderEmotions(this.dataManager.emotions);
+            this.renderEmotions(this.dataManager.getAllEmotions());
             this.showMessage('表情包添加成功', 'success');
         } catch (error) {
             console.error('添加表情包失败:', error);
             this.showMessage('添加失败: ' + error.message, 'error');
+        }
+    }
+
+    async addFromUrlLocal(url, keyword) {
+        const configHint = this.storageManager.getLocalConfigHint();
+        if (configHint) {
+            this.showMessage(configHint, 'error');
+            return;
+        }
+
+        if (this.dataManager.getAllEmotions().some(e => e.url === url)) {
+            this.showMessage('该表情包已存在', 'error');
+            return;
+        }
+
+        try {
+            this.showMessage('正在下载图片到本地...', 'info');
+            const finalUrl = await this.storageManager.downloadAndSaveToLocal(url);
+
+            const emotion = {
+                id: this.dataManager.generateId(),
+                url: finalUrl,
+                storageType: 'local',
+                tags: [keyword],
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            };
+
+            this.dataManager.addEmotion(emotion, 'local');
+            await this.dataManager.saveData();
+            this.switchTab('mine');
+            this.renderEmotions(this.dataManager.getAllEmotions());
+            this.showMessage('表情包下载成功', 'success');
+        } catch (error) {
+            console.error('下载表情包失败:', error);
+            this.showMessage('下载失败: ' + error.message, 'error');
+        }
+    }
+
+    async addFromUrlCloud(url, keyword) {
+        const configHint = this.storageManager.getCloudConfigHint();
+        if (configHint) {
+            this.showMessage(configHint, 'error');
+            return;
+        }
+
+        if (this.dataManager.getAllEmotions().some(e => e.url === url)) {
+            this.showMessage('该表情包已存在', 'error');
+            return;
+        }
+
+        try {
+            this.showMessage('正在上传图片到云端...', 'info');
+            const finalUrl = await this.storageManager.uploadUrlToCloud(url);
+
+            const emotion = {
+                id: this.dataManager.generateId(),
+                url: finalUrl,
+                storageType: 'cloud',
+                tags: [keyword],
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            };
+
+            this.dataManager.addEmotion(emotion, 'cloud');
+            await this.dataManager.saveData();
+            this.switchTab('mine');
+            this.renderEmotions(this.dataManager.getAllEmotions());
+            this.showMessage('表情包上传成功', 'success');
+        } catch (error) {
+            console.error('上传表情包失败:', error);
+            this.showMessage('上传失败: ' + error.message, 'error');
         }
     }
 
@@ -838,7 +954,7 @@ class EmotionManager {
                     return;
                 }
                 
-                const response = await fetch(url, { method: 'HEAD' });
+                const response = await this.fetchWithTimeout(url, { method: 'HEAD' });
                 if (!response.ok) {
                     throw new Error('图片URL无效');
                 }
@@ -851,8 +967,9 @@ class EmotionManager {
                 this.showMessage('正在处理图片...', 'info');
                 
                 let finalUrl;
+                const storageType = this.storageManager.selectedStorage;
                 
-                if (this.storageManager.selectedStorage === 'local') {
+                if (storageType === 'local') {
                     this.showMessage('正在下载图片到本地文件夹...', 'info');
                     finalUrl = await this.storageManager.downloadAndSaveToLocal(url);
                 } else {
@@ -863,13 +980,13 @@ class EmotionManager {
                 const emotion = {
                     id: this.dataManager.generateId(),
                     url: finalUrl,
-                    storageType: this.storageManager.selectedStorage,
+                    storageType: storageType,
                     tags: tags,
                     createdAt: new Date().toISOString(),
                     updatedAt: new Date().toISOString()
                 };
                 
-                this.dataManager.emotions.push(emotion);
+                this.dataManager.addEmotion(emotion, storageType);
                 await this.dataManager.saveData();
                 this.renderAllViews();
                 this.hideModal('addModal');
@@ -886,18 +1003,19 @@ class EmotionManager {
                 
                 this.showMessage('正在处理...', 'info');
                 
-                let url;
+                let finalUrl;
+                const storageType = this.storageManager.selectedStorage;
                 
-                if (this.storageManager.selectedStorage === 'local') {
-                    url = await this.storageManager.saveToLocal(fileInput.files[0]);
+                if (storageType === 'local') {
+                    finalUrl = await this.storageManager.saveToLocal(fileInput.files[0]);
                 } else {
-                    url = await this.storageManager.uploadToCloud(fileInput.files[0]);
+                    finalUrl = await this.storageManager.uploadToCloud(fileInput.files[0]);
                 }
                 
                 const emotion = {
                     id: this.dataManager.generateId(),
-                    url: url,
-                    storageType: this.storageManager.selectedStorage,
+                    url: finalUrl,
+                    storageType: storageType,
                     tags: tags,
                     createdAt: new Date().toISOString(),
                     updatedAt: new Date().toISOString(),
@@ -907,7 +1025,7 @@ class EmotionManager {
                     }
                 };
                 
-                this.dataManager.emotions.push(emotion);
+                this.dataManager.addEmotion(emotion, storageType);
                 await this.dataManager.saveData();
                 this.renderAllViews();
                 this.hideModal('addModal');
@@ -932,37 +1050,28 @@ class EmotionManager {
         saveBtn.innerHTML = '<i class="mdi mdi-loading mdi-spin"></i> 保存中...';
 
         try {
-            const newCloudProvider = document.getElementById('cloudProvider').value;
             const newLocalPath = document.getElementById('localPath').value;
-
-            console.log('表单中的 cloudProvider:', newCloudProvider);
             console.log('表单中的 localPath:', newLocalPath);
-
-            this.dataManager.settings.cloudProvider = newCloudProvider;
             this.dataManager.settings.localPath = newLocalPath;
 
-            this.dataManager.settings.cloudConfig = {
-                s3Endpoint: document.getElementById('s3Endpoint').value.trim(),
-                s3AccessKey: document.getElementById('s3AccessKey').value.trim(),
-                s3SecretKey: document.getElementById('s3SecretKey').value.trim(),
-                s3Bucket: document.getElementById('s3Bucket').value.trim(),
-                s3Region: document.getElementById('s3Region').value.trim(),
-                imgbbApiKey: document.getElementById('imgbbApiKey')?.value.trim() || '',
-                smmsToken: document.getElementById('smmsToken')?.value.trim() || ''
-            };
+            const cloudProvider = document.getElementById('cloudProvider').value;
+            console.log('表单中的 cloudProvider:', cloudProvider);
+            this.dataManager.settings.cloudProvider = cloudProvider;
 
-            this.dataManager.settings.syncConfig = {
-                provider: document.getElementById('syncProvider').value,
-                webdavUrl: document.getElementById('webdavUrl').value.trim(),
-                webdavUsername: document.getElementById('webdavUsername').value.trim(),
-                webdavPassword: document.getElementById('webdavPassword').value.trim(),
-                gitRemote: document.getElementById('gitRemote').value.trim()
-            };
+            if (!this.dataManager.settings.cloudConfig) {
+                this.dataManager.settings.cloudConfig = {};
+            }
 
-            const selectedTheme = document.querySelector('input[name="theme"]:checked');
-            if (selectedTheme) {
-                this.dataManager.settings.themePreference = selectedTheme.value;
-                this.themeManager.setUserPreference(selectedTheme.value);
+            if (cloudProvider === 'imgbb') {
+                const imgbbApiKey = document.getElementById('imgbbApiKey').value;
+                console.log('表单中的 imgbbApiKey:', imgbbApiKey);
+                this.dataManager.settings.cloudConfig.imgbbApiKey = imgbbApiKey;
+            } else if (cloudProvider === 's3') {
+                this.dataManager.settings.cloudConfig.s3Endpoint = document.getElementById('s3Endpoint').value;
+                this.dataManager.settings.cloudConfig.s3AccessKey = document.getElementById('s3AccessKey').value;
+                this.dataManager.settings.cloudConfig.s3SecretKey = document.getElementById('s3SecretKey').value;
+                this.dataManager.settings.cloudConfig.s3Bucket = document.getElementById('s3Bucket').value;
+                this.dataManager.settings.cloudConfig.s3Region = document.getElementById('s3Region').value;
             }
 
             console.log('准备保存到数据库的 settings:', this.dataManager.settings);
@@ -991,6 +1100,15 @@ class EmotionManager {
             }, 2000);
 
             this.showMessage('保存设置失败: ' + error.message, 'error');
+        }
+    }
+
+    async saveDeleteLocalFileSetting() {
+        const deleteLocalFileCheckbox = document.getElementById('deleteLocalFile');
+        if (deleteLocalFileCheckbox) {
+            this.dataManager.settings.deleteLocalFile = deleteLocalFileCheckbox.checked;
+            await this.dataManager.saveSettings();
+            this.showMessage('设置已保存', 'success');
         }
     }
 
@@ -1035,14 +1153,7 @@ class EmotionManager {
                 return;
             }
             this.showMessage('ImgBB配置正常', 'success');
-        } else if (provider === 'smms') {
-            const token = document.getElementById('smmsToken')?.value;
-            if (!token) {
-                this.showMessage('请先配置SM.MS Token', 'error');
-                return;
-            }
-            this.showMessage('SM.MS配置正常', 'success');
-        } else if (provider === 's3' || provider === 'github') {
+        } else if (provider === 's3') {
             const endpoint = document.getElementById('s3Endpoint')?.value;
             const accessKey = document.getElementById('s3AccessKey')?.value;
             const secretKey = document.getElementById('s3SecretKey')?.value;

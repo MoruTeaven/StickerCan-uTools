@@ -87,6 +87,20 @@ window.emotionCan = {
     return fs.existsSync(filePath);
   },
 
+  // 删除文件
+  deleteFile: function(filePath) {
+    try {
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('删除文件失败:', error);
+      return false;
+    }
+  },
+
   // 获取用户默认目录
   getDefaultDir: function() {
     return path.join(os.homedir(), '表情罐头');

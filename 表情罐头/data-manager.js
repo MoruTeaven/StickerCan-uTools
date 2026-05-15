@@ -1,86 +1,160 @@
 class DataManager {
     constructor() {
-        this.emotions = [];
+        this.emotions = {
+            local: [],
+            cloud: []
+        };
         this.settings = null;
+        this.migrationDone = false;
+        // 获取设备 ID，用于区别设备
+        this.nativeId = utools.getNativeId();
     }
 
     async loadData() {
         try {
             console.log('===== 开始加载数据 =====');
+            console.log('当前设备 ID:', this.nativeId);
             
-            const emotionsData = await utools.db.get('emotions');
-            console.log('读取到的 emotionsData:', emotionsData);
-            
-            const settingsData = await utools.db.get('settings');
-            console.log('读取到的 settingsData:', settingsData);
-            
-            if (emotionsData) {
-                this.emotions = emotionsData.data || [];
-                console.log('加载的表情包数量:', this.emotions.length);
+            // 加载本地表情包（utools.dbStorage，不会同步）
+            // 使用设备 ID 作为 key 前缀，确保只与当前设备相关
+            const localEmotionsKey = this.nativeId + '/emotions_local';
+            const localEmotions = utools.dbStorage.getItem(localEmotionsKey);
+            if (localEmotions && Array.isArray(localEmotions)) {
+                this.emotions.local = localEmotions;
+                console.log('本地表情包加载成功，数量:', this.emotions.local.length);
+            } else {
+                // 尝试从旧的 key 迁移数据
+                const oldLocalEmotions = utools.dbStorage.getItem('emotions_local');
+                if (oldLocalEmotions && Array.isArray(oldLocalEmotions)) {
+                    console.log('检测到旧的本地数据，迁移到新的 key');
+                    this.emotions.local = oldLocalEmotions;
+                    utools.dbStorage.setItem(localEmotionsKey, this.emotions.local);
+                }
             }
             
+            // 加载云端表情包（utools.db，会同步）
+            const cloudData = await utools.db.promises.get('emotions_cloud');
+            if (cloudData && cloudData.data && Array.isArray(cloudData.data)) {
+                this.emotions.cloud = cloudData.data;
+                console.log('云端表情包加载成功，数量:', this.emotions.cloud.length);
+            }
+            
+            // 检查是否需要从旧的单一结构迁移数据
+            const hasOldData = await this.checkOldData();
+            if (hasOldData) {
+                const oldData = await utools.db.promises.get('emotions');
+                if (oldData && oldData.data && Array.isArray(oldData.data)) {
+                    console.log('检测到旧数据，开始迁移...');
+                    await this.migrateOldData(oldData.data);
+                    this.migrationDone = true;
+                }
+            }
+            
+            // 加载设置
+            const settingsData = await utools.db.promises.get('settings');
             if (settingsData) {
                 this.settings = settingsData.data;
-                console.log('加载到的 settings:', this.settings);
+                console.log('设置加载成功:', this.settings);
             } else {
                 console.log('没有找到已保存的设置，使用默认值');
-                let defaultLocalPath = '';
+                let defaultLocalPath = 'E:\\图片\\表情包';
                 if (window.emotionCan && typeof window.emotionCan.getDefaultDir === 'function') {
                     defaultLocalPath = window.emotionCan.getDefaultDir();
                 }
                 
                 this.settings = {
-                    cloudProvider: 'utools',
+                    cloudProvider: 'imgbb',
                     localPath: defaultLocalPath,
                     cloudConfig: {},
-                    syncConfig: {}
+                    syncConfig: {},
+                    deleteLocalFile: false
                 };
                 console.log('使用的默认 settings:', this.settings);
             }
-            
-            console.log('===== 数据加载结束 =====');
+
+            console.log('===== 数据加载完成 =====');
+            console.log('本地表情包数量:', this.emotions.local.length);
+            console.log('云端表情包数量:', this.emotions.cloud.length);
         } catch (error) {
             console.error('加载数据失败:', error);
-            this.emotions = [];
+            this.emotions = { local: [], cloud: [] };
             
-            let defaultLocalPath = '';
+            let defaultLocalPath = 'E:\\图片\\表情包';
             if (window.emotionCan && typeof window.emotionCan.getDefaultDir === 'function') {
                 defaultLocalPath = window.emotionCan.getDefaultDir();
             }
             
             this.settings = {
-                cloudProvider: 'utools',
+                cloudProvider: 'imgbb',
                 localPath: defaultLocalPath,
                 cloudConfig: {},
-                syncConfig: {}
+                syncConfig: {},
+                deleteLocalFile: false
             };
         }
+    }
+
+    async checkOldData() {
+        try {
+            // 检查是否有旧的单一结构数据
+            const oldData = await utools.db.promises.get('emotions');
+            const localEmotionsKey = this.nativeId + '/emotions_local';
+            const localData = utools.dbStorage.getItem(localEmotionsKey);
+            
+            // 只有同时存在旧数据且新数据为空时才迁移
+            return oldData && oldData.data && Array.isArray(oldData.data) && 
+                   (!localData || !Array.isArray(localData) || localData.length === 0);
+        } catch (e) {
+            return false;
+        }
+    }
+
+    async migrateOldData(oldEmotions) {
+        console.log('开始迁移旧数据，共', oldEmotions.length, '个表情包');
+        
+        // 按 storageType 分类
+        this.emotions.local = oldEmotions.filter(e => e.storageType === 'local' || !e.storageType);
+        this.emotions.cloud = oldEmotions.filter(e => e.storageType === 'cloud');
+        
+        // 给没有 storageType 的数据补上
+        this.emotions.local.forEach(e => {
+            if (!e.storageType) e.storageType = 'local';
+        });
+        
+        console.log('迁移后本地:', this.emotions.local.length, '个');
+        console.log('迁移后云端:', this.emotions.cloud.length, '个');
+        
+        // 保存新结构数据
+        await this.saveData();
+        
+        console.log('数据迁移完成！');
     }
 
     async saveData() {
         try {
             console.log('===== 开始保存表情包数据 =====');
-            console.log('准备保存的表情包数量:', this.emotions.length);
-            console.log('准备保存的表情包:', this.emotions);
+            console.log('准备保存的本地表情包数量:', this.emotions.local.length);
+            console.log('准备保存的云端表情包数量:', this.emotions.cloud.length);
             
-            try {
-                await utools.db.remove('emotions');
-                console.log('旧表情包数据已删除');
-            } catch (e) {
-                console.log('没有旧表情包数据，无需删除');
+            // 保存本地表情包到 dbStorage（不会同步）
+            // 使用设备 ID 作为 key 前缀，确保只与当前设备相关
+            const localEmotionsKey = this.nativeId + '/emotions_local';
+            utools.dbStorage.setItem(localEmotionsKey, this.emotions.local);
+            console.log('本地表情包保存成功，key:', localEmotionsKey);
+            
+            // 保存云端表情包到 db（会同步）
+            const existingCloud = await utools.db.promises.get('emotions_cloud');
+            const cloudDoc = {
+                _id: 'emotions_cloud',
+                data: this.emotions.cloud
+            };
+            if (existingCloud && existingCloud._rev) {
+                cloudDoc._rev = existingCloud._rev;
             }
+            const cloudResult = await utools.db.promises.put(cloudDoc);
+            console.log('云端表情包保存成功:', cloudResult);
             
-            const result = await utools.db.put({
-                _id: 'emotions',
-                data: this.emotions
-            });
-            
-            console.log('表情包数据保存成功，返回结果:', result);
-            
-            const verifyData = await utools.db.get('emotions');
-            console.log('验证保存后读取到的表情包数据:', verifyData);
-            
-            console.log('===== 表情包数据保存流程结束 =====');
+            console.log('===== 表情包数据保存完成 =====');
         } catch (error) {
             console.error('保存表情包数据失败:', error);
             throw new Error('保存失败: ' + error.message);
@@ -90,24 +164,19 @@ class DataManager {
     async saveSettings() {
         try {
             console.log('===== 开始保存设置 =====');
-            console.log('准备保存到数据库的 settings:', this.settings);
+            console.log('准备保存的 settings:', this.settings);
             
-            try {
-                await utools.db.remove('settings');
-                console.log('旧设置已删除');
-            } catch (e) {
-                console.log('没有旧设置，无需删除');
-            }
-            
-            const result = await utools.db.put({
+            const existingSettings = await utools.db.promises.get('settings');
+            const settingsDoc = {
                 _id: 'settings',
                 data: this.settings
-            });
+            };
+            if (existingSettings && existingSettings._rev) {
+                settingsDoc._rev = existingSettings._rev;
+            }
             
-            console.log('设置保存成功，返回结果:', result);
-            
-            const verifyData = await utools.db.get('settings');
-            console.log('验证保存后读取到的数据:', verifyData);
+            const result = await utools.db.promises.put(settingsDoc);
+            console.log('设置保存成功:', result);
             
             console.log('===== 保存流程结束 =====');
         } catch (error) {
@@ -122,5 +191,36 @@ class DataManager {
             const v = c === 'x' ? r : (r & 0x3 | 0x8);
             return v.toString(16);
         });
+    }
+
+    getAllEmotions() {
+        return [...this.emotions.local, ...this.emotions.cloud];
+    }
+
+    findEmotionByUrl(url) {
+        const all = this.getAllEmotions();
+        return all.find(e => e.url === url);
+    }
+
+    addEmotion(emotion, storageType) {
+        if (storageType === 'local') {
+            this.emotions.local.push(emotion);
+        } else {
+            this.emotions.cloud.push(emotion);
+        }
+    }
+
+    removeEmotion(emotion) {
+        if (emotion.storageType === 'local') {
+            const index = this.emotions.local.findIndex(e => e.id === emotion.id);
+            if (index !== -1) {
+                this.emotions.local.splice(index, 1);
+            }
+        } else {
+            const index = this.emotions.cloud.findIndex(e => e.id === emotion.id);
+            if (index !== -1) {
+                this.emotions.cloud.splice(index, 1);
+            }
+        }
     }
 }

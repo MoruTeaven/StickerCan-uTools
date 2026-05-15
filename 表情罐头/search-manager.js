@@ -1,4 +1,23 @@
 class SearchManager {
+    async fetchWithTimeout(url, options = {}, timeout = 30000) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeout);
+        
+        try {
+            const response = await fetch(url, {
+                ...options,
+                signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+            return response;
+        } catch (error) {
+            clearTimeout(timeoutId);
+            if (error.name === 'AbortError') {
+                throw new Error('请求超时，请检查网络连接');
+            }
+            throw error;
+        }
+    }
     constructor(emotionManager) {
         this.emotionManager = emotionManager;
         this.apihzResults = [];
@@ -24,6 +43,12 @@ class SearchManager {
         this.currentTangdouziPage = 1;
         this.tangdouziHasMore = true;
         this.tangdouziLoading = false;
+        
+        this.yujianResults = [];
+        this.currentYujianKeyword = '';
+        this.currentYujianPage = 1;
+        this.yujianHasMore = true;
+        this.yujianLoading = false;
     }
 
     handleSearch() {
@@ -40,6 +65,8 @@ class SearchManager {
             this.searchSogou(keyword);
         } else if (currentTab === 'tangdouzi') {
             this.searchTangdouzi(keyword);
+        } else if (currentTab === 'yujian') {
+            this.searchYujian(keyword);
         }
     }
 
@@ -82,12 +109,11 @@ class SearchManager {
             const limit = 30;
             const offset = (page - 1) * limit;
             const url = `https://cn.apihz.cn/api/img/apihzbqb.php?id=10016659&key=60f12f4aec521722296bf562e45d8908&type=1&limit=${limit}&offset=${offset}&words=${encodeURIComponent(keyword)}`;
-            const response = await fetch(url);
+            const response = await this.fetchWithTimeout(url);
             const data = await response.json();
             
             console.log('ApiHz API返回:', data);
             
-            // 兼容不同的数据结构
             let imageUrls = [];
             if (data.code === 200 && data.res) {
                 if (Array.isArray(data.res)) {
@@ -141,9 +167,14 @@ class SearchManager {
             <div class="result-item" data-url="${imgUrl}">
                 <img src="${imgUrl}" alt="表情包" 
                      onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iIzMzMyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIzc3NyIgPkltYWdlPC90ZXh0Pjwvc3ZnPg=='">
-                <button class="add-btn" onclick="emotionManager.addFromUrl('${imgUrl}', '${keyword}')">
-                    <i class="mdi mdi-plus"></i> 添加到我的
-                </button>
+                <div class="search-result-buttons">
+                    <button class="add-btn local" onclick="emotionManager.addFromUrlLocal('${imgUrl}', '${keyword}')">
+                        <i class="mdi mdi-folder"></i> 本地
+                    </button>
+                    <button class="add-btn cloud" onclick="emotionManager.addFromUrlCloud('${imgUrl}', '${keyword}')">
+                        <i class="mdi mdi-cloud"></i> 云端
+                    </button>
+                </div>
             </div>
         `).join('');
         
@@ -172,9 +203,14 @@ class SearchManager {
             div.innerHTML = `
                 <img src="${imgUrl}" alt="表情包" 
                      onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iIzMzMyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIzc3NyIgPkltYWdlPC90ZXh0Pjwvc3ZnPg=='">
-                <button class="add-btn" onclick="emotionManager.addFromUrl('${imgUrl}', '${keyword}')">
-                    <i class="mdi mdi-plus"></i> 添加到我的
-                </button>
+                <div class="search-result-buttons">
+                    <button class="add-btn local" onclick="emotionManager.addFromUrlLocal('${imgUrl}', '${keyword}')">
+                        <i class="mdi mdi-folder"></i> 本地
+                    </button>
+                    <button class="add-btn cloud" onclick="emotionManager.addFromUrlCloud('${imgUrl}', '${keyword}')">
+                        <i class="mdi mdi-cloud"></i> 云端
+                    </button>
+                </div>
             `;
             externalResults.appendChild(div);
         });
@@ -222,7 +258,7 @@ class SearchManager {
         try {
             const limit = 10;
             const url = `https://cn.apihz.cn/api/img/apihzbqbbaidu.php?id=10016659&key=60f12f4aec521722296bf562e45d8908&limit=${limit}&page=${page}&words=${encodeURIComponent(keyword)}`;
-            const response = await fetch(url);
+            const response = await this.fetchWithTimeout(url);
             const data = await response.json();
             
             if (data.code === 200 && data.res && data.res.length > 0) {
@@ -265,9 +301,14 @@ class SearchManager {
             <div class="result-item" data-url="${imgUrl}">
                 <img src="${imgUrl}" alt="表情包" 
                      onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iIzMzMyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIzc3NyIgPkltYWdlPC90ZXh0Pjwvc3ZnPg=='">
-                <button class="add-btn" onclick="emotionManager.addFromUrl('${imgUrl}', '${keyword}')">
-                    <i class="mdi mdi-plus"></i> 添加到我的
-                </button>
+                <div class="search-result-buttons">
+                    <button class="add-btn local" onclick="emotionManager.addFromUrlLocal('${imgUrl}', '${keyword}')">
+                        <i class="mdi mdi-folder"></i> 本地
+                    </button>
+                    <button class="add-btn cloud" onclick="emotionManager.addFromUrlCloud('${imgUrl}', '${keyword}')">
+                        <i class="mdi mdi-cloud"></i> 云端
+                    </button>
+                </div>
             </div>
         `).join('');
         
@@ -296,9 +337,14 @@ class SearchManager {
             div.innerHTML = `
                 <img src="${imgUrl}" alt="表情包" 
                      onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iIzMzMyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIzc3NyIgPkltYWdlPC90ZXh0Pjwvc3ZnPg=='">
-                <button class="add-btn" onclick="emotionManager.addFromUrl('${imgUrl}', '${keyword}')">
-                    <i class="mdi mdi-plus"></i> 添加到我的
-                </button>
+                <div class="search-result-buttons">
+                    <button class="add-btn local" onclick="emotionManager.addFromUrlLocal('${imgUrl}', '${keyword}')">
+                        <i class="mdi mdi-folder"></i> 本地
+                    </button>
+                    <button class="add-btn cloud" onclick="emotionManager.addFromUrlCloud('${imgUrl}', '${keyword}')">
+                        <i class="mdi mdi-cloud"></i> 云端
+                    </button>
+                </div>
             `;
             externalResults.appendChild(div);
         });
@@ -345,7 +391,7 @@ class SearchManager {
 
         try {
             const url = `https://cn.apihz.cn/api/img/apihzbqbsougou.php?id=10016659&key=60f12f4aec521722296bf562e45d8908&page=${page}&words=${encodeURIComponent(keyword)}`;
-            const response = await fetch(url);
+            const response = await this.fetchWithTimeout(url);
             const data = await response.json();
             
             if (data.code === 200 && data.res && data.res.length > 0) {
@@ -388,9 +434,14 @@ class SearchManager {
             <div class="result-item" data-url="${imgUrl}">
                 <img src="${imgUrl}" alt="表情包" 
                      onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iIzMzMyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIzc3NyIgPkltYWdlPC90ZXh0Pjwvc3ZnPg=='">
-                <button class="add-btn" onclick="emotionManager.addFromUrl('${imgUrl}', '${keyword}')">
-                    <i class="mdi mdi-plus"></i> 添加到我的
-                </button>
+                <div class="search-result-buttons">
+                    <button class="add-btn local" onclick="emotionManager.addFromUrlLocal('${imgUrl}', '${keyword}')">
+                        <i class="mdi mdi-folder"></i> 本地
+                    </button>
+                    <button class="add-btn cloud" onclick="emotionManager.addFromUrlCloud('${imgUrl}', '${keyword}')">
+                        <i class="mdi mdi-cloud"></i> 云端
+                    </button>
+                </div>
             </div>
         `).join('');
         
@@ -419,9 +470,14 @@ class SearchManager {
             div.innerHTML = `
                 <img src="${imgUrl}" alt="表情包" 
                      onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iIzMzMyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIzc3NyIgPkltYWdlPC90ZXh0Pjwvc3ZnPg=='">
-                <button class="add-btn" onclick="emotionManager.addFromUrl('${imgUrl}', '${keyword}')">
-                    <i class="mdi mdi-plus"></i> 添加到我的
-                </button>
+                <div class="search-result-buttons">
+                    <button class="add-btn local" onclick="emotionManager.addFromUrlLocal('${imgUrl}', '${keyword}')">
+                        <i class="mdi mdi-folder"></i> 本地
+                    </button>
+                    <button class="add-btn cloud" onclick="emotionManager.addFromUrlCloud('${imgUrl}', '${keyword}')">
+                        <i class="mdi mdi-cloud"></i> 云端
+                    </button>
+                </div>
             `;
             externalResults.appendChild(div);
         });
@@ -470,7 +526,7 @@ class SearchManager {
 
         try {
             const url = `https://api.tangdouz.com/a/biaoq.php?return=json&nr=${encodeURIComponent(keyword)}`;
-            const response = await fetch(url);
+            const response = await this.fetchWithTimeout(url);
             const data = await response.json();
             
             console.log('糖豆子API返回:', data);
@@ -492,16 +548,13 @@ class SearchManager {
                 
                 if (isFirstPage) {
                     this.tangdouziResults = imageUrls;
-                    // 糖豆子接口不支持分页，但我们可以显示按钮让用户再次搜索或刷新
                     this.displayTangdouziResults(this.tangdouziResults, keyword, true);
                 } else {
-                    // 追加新内容，避免重复
                     const newUniqueUrls = imageUrls.filter(url => !this.tangdouziResults.includes(url));
                     if (newUniqueUrls.length > 0) {
                         this.tangdouziResults = [...this.tangdouziResults, ...newUniqueUrls];
                         this.appendTangdouziResults(newUniqueUrls, keyword);
                     } else {
-                        // 如果没有新内容，显示提示
                         this.tangdouziHasMore = false;
                         this.tangdouziLoading = false;
                         const btn = document.querySelector('.load-more-container');
@@ -513,7 +566,6 @@ class SearchManager {
                     }
                 }
                 
-                // 糖豆子接口可能会返回重复内容，所以始终显示继续按钮
                 this.tangdouziHasMore = true;
                 this.tangdouziLoading = false;
             } else {
@@ -542,9 +594,14 @@ class SearchManager {
             <div class="result-item" data-url="${imgUrl}">
                 <img src="${imgUrl}" alt="表情包" 
                      onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iIzMzMyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIzc3NyIgPkltYWdlPC90ZXh0Pjwvc3ZnPg=='">
-                <button class="add-btn" onclick="emotionManager.addFromUrl('${imgUrl}', '${keyword}')">
-                    <i class="mdi mdi-plus"></i> 添加到我的
-                </button>
+                <div class="search-result-buttons">
+                    <button class="add-btn local" onclick="emotionManager.addFromUrlLocal('${imgUrl}', '${keyword}')">
+                        <i class="mdi mdi-folder"></i> 本地
+                    </button>
+                    <button class="add-btn cloud" onclick="emotionManager.addFromUrlCloud('${imgUrl}', '${keyword}')">
+                        <i class="mdi mdi-cloud"></i> 云端
+                    </button>
+                </div>
             </div>
         `).join('');
         
@@ -573,9 +630,14 @@ class SearchManager {
             div.innerHTML = `
                 <img src="${imgUrl}" alt="表情包" 
                      onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iIzc3NyIgPkltYWdlPC90ZXh0Pjwvc3ZnPg=='">
-                <button class="add-btn" onclick="emotionManager.addFromUrl('${imgUrl}', '${keyword}')">
-                    <i class="mdi mdi-plus"></i> 添加到我的
-                </button>
+                <div class="search-result-buttons">
+                    <button class="add-btn local" onclick="emotionManager.addFromUrlLocal('${imgUrl}', '${keyword}')">
+                        <i class="mdi mdi-folder"></i> 本地
+                    </button>
+                    <button class="add-btn cloud" onclick="emotionManager.addFromUrlCloud('${imgUrl}', '${keyword}')">
+                        <i class="mdi mdi-cloud"></i> 云端
+                    </button>
+                </div>
             `;
             externalResults.appendChild(div);
         });
@@ -600,18 +662,187 @@ class SearchManager {
                 btn.querySelector('.mdi').classList.remove('mdi-chevron-down');
                 btn.querySelector('.mdi').classList.add('mdi-loading');
             }
-            // 传入page=2，让代码走追加逻辑
             this.searchTangdouzi(this.currentTangdouziKeyword, 2);
+        }
+    }
+
+    async searchYujian(keyword, page = 1) {
+        if (!keyword) {
+            this.emotionManager.showMessage('请输入搜索关键词', 'error');
+            return;
+        }
+
+        const externalResults = document.getElementById('externalResults');
+        
+        const isFirstPage = page === 1;
+        if (isFirstPage) {
+            externalResults.style.display = 'block';
+            externalResults.innerHTML = '<p class="hint-text">正在搜索...</p>';
+            this.yujianHasMore = true;
+            this.yujianLoading = false;
+        } else {
+            externalResults.style.display = 'grid';
+        }
+
+        try {
+            const count = 40;
+            const url = `https://api.yujn.cn/api/bbq_ss.php?count=${count}&msg=${encodeURIComponent(keyword)}`;
+            const response = await this.fetchWithTimeout(url);
+            const data = await response.json();
+            
+            console.log('遇见API返回:', data);
+            
+            let imageUrls = [];
+            if (data.code === 200 && Array.isArray(data.data) && data.data.length > 0) {
+                imageUrls = data.data.map(url => {
+                    if (typeof url === 'string') {
+                        return url.replace(/`/g, '').trim();
+                    }
+                    return url;
+                }).filter(url => url && typeof url === 'string');
+            } else if (Array.isArray(data) && data.length > 0) {
+                imageUrls = data.filter(url => url && typeof url === 'string');
+            } else if (data.code === 200 && data.res) {
+                if (Array.isArray(data.res)) {
+                    imageUrls = data.res.filter(url => url && typeof url === 'string');
+                } else if (typeof data.res === 'string') {
+                    imageUrls = [data.res];
+                }
+            } else if (typeof data === 'object' && data.url) {
+                imageUrls = [data.url];
+            }
+            
+            if (imageUrls.length > 0) {
+                this.currentYujianKeyword = keyword;
+                this.currentYujianPage = page;
+                
+                if (isFirstPage) {
+                    this.yujianResults = imageUrls;
+                    this.displayYujianResults(this.yujianResults, keyword, true);
+                } else {
+                    const newUniqueUrls = imageUrls.filter(url => !this.yujianResults.includes(url));
+                    if (newUniqueUrls.length > 0) {
+                        this.yujianResults = [...this.yujianResults, ...newUniqueUrls];
+                        this.appendYujianResults(newUniqueUrls, keyword);
+                    } else {
+                        this.yujianHasMore = false;
+                        this.yujianLoading = false;
+                        const btn = document.querySelector('.load-more-container');
+                        if (btn) {
+                            btn.remove();
+                        }
+                        this.emotionManager.showMessage('没有更多新表情包了', 'info');
+                        return;
+                    }
+                }
+                
+                this.yujianHasMore = true;
+                this.yujianLoading = false;
+            } else {
+                if (isFirstPage) {
+                    externalResults.innerHTML = '<p class="hint-text">未找到表情包，请尝试其他关键词</p>';
+                } else {
+                    this.yujianHasMore = false;
+                    this.yujianLoading = false;
+                    this.emotionManager.showMessage('没有更多表情包了', 'info');
+                }
+            }
+        } catch (error) {
+            console.error('搜索失败:', error);
+            if (isFirstPage) {
+                externalResults.innerHTML = '<p class="hint-text">搜索失败，请稍后重试</p>';
+            }
+            this.emotionManager.showMessage('搜索失败: ' + error.message, 'error');
+            this.yujianLoading = false;
+        }
+    }
+
+    displayYujianResults(images, keyword, hasMore) {
+        const externalResults = document.getElementById('externalResults');
+        externalResults.style.display = 'grid';
+        externalResults.innerHTML = images.map((imgUrl, index) => `
+            <div class="result-item" data-url="${imgUrl}">
+                <img src="${imgUrl}" alt="表情包" 
+                     onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iIzMzMyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIzc3NyIgPkltYWdlPC90ZXh0Pjwvc3ZnPg=='">
+                <div class="search-result-buttons">
+                    <button class="add-btn local" onclick="emotionManager.addFromUrlLocal('${imgUrl}', '${keyword}')">
+                        <i class="mdi mdi-folder"></i> 本地
+                    </button>
+                    <button class="add-btn cloud" onclick="emotionManager.addFromUrlCloud('${imgUrl}', '${keyword}')">
+                        <i class="mdi mdi-cloud"></i> 云端
+                    </button>
+                </div>
+            </div>
+        `).join('');
+        
+        if (hasMore) {
+            externalResults.innerHTML += `
+                <div class="load-more-container">
+                    <button class="load-more-btn" onclick="emotionManager.searchManager.loadMoreYujian()">
+                        <i class="mdi mdi-chevron-down"></i> 继续
+                    </button>
+                </div>
+            `;
+        }
+    }
+
+    appendYujianResults(newImages, keyword) {
+        const externalResults = document.getElementById('externalResults');
+        const loadMoreContainer = externalResults.querySelector('.load-more-container');
+        if (loadMoreContainer) {
+            loadMoreContainer.remove();
+        }
+        
+        newImages.forEach(imgUrl => {
+            const div = document.createElement('div');
+            div.className = 'result-item';
+            div.dataset.url = imgUrl;
+            div.innerHTML = `
+                <img src="${imgUrl}" alt="表情包" 
+                     onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iIzMzMyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIzc3NyIgPkltYWdlPC90ZXh0Pjwvc3ZnPg=='">
+                <div class="search-result-buttons">
+                    <button class="add-btn local" onclick="emotionManager.addFromUrlLocal('${imgUrl}', '${keyword}')">
+                        <i class="mdi mdi-folder"></i> 本地
+                    </button>
+                    <button class="add-btn cloud" onclick="emotionManager.addFromUrlCloud('${imgUrl}', '${keyword}')">
+                        <i class="mdi mdi-cloud"></i> 云端
+                    </button>
+                </div>
+            `;
+            externalResults.appendChild(div);
+        });
+        
+        if (this.yujianHasMore) {
+            externalResults.innerHTML += `
+                <div class="load-more-container">
+                    <button class="load-more-btn" onclick="emotionManager.searchManager.loadMoreYujian()">
+                        <i class="mdi mdi-chevron-down"></i> 继续
+                    </button>
+                </div>
+            `;
+        }
+    }
+
+    loadMoreYujian() {
+        if (this.currentYujianKeyword && this.yujianHasMore && !this.yujianLoading) {
+            this.yujianLoading = true;
+            const btn = document.querySelector('.load-more-btn');
+            if (btn) {
+                btn.classList.add('loading');
+                btn.querySelector('.mdi').classList.remove('mdi-chevron-down');
+                btn.querySelector('.mdi').classList.add('mdi-loading');
+            }
+            this.searchYujian(this.currentYujianKeyword, 2);
         }
     }
 
     searchEmotions(keyword) {
         if (!keyword.trim()) {
-            this.emotionManager.renderEmotions(this.emotionManager.dataManager.emotions);
+            this.emotionManager.renderEmotions(this.emotionManager.dataManager.getAllEmotions());
             return;
         }
         
-        const filtered = this.emotionManager.dataManager.emotions.filter(emotion => {
+        const filtered = this.emotionManager.dataManager.getAllEmotions().filter(emotion => {
             if (!emotion.tags || !Array.isArray(emotion.tags)) {
                 return false;
             }
@@ -666,6 +897,15 @@ class SearchManager {
                 if (scrollTop + clientHeight >= scrollHeight - 200) {
                     this.tangdouziLoading = true;
                     this.searchTangdouzi(this.currentTangdouziKeyword, this.currentTangdouziPage + 1);
+                }
+            } else if (currentTab === 'yujian' && this.yujianHasMore && !this.yujianLoading) {
+                const scrollHeight = mainContent.scrollHeight;
+                const scrollTop = mainContent.scrollTop;
+                const clientHeight = mainContent.clientHeight;
+                
+                if (scrollTop + clientHeight >= scrollHeight - 200) {
+                    this.yujianLoading = true;
+                    this.searchYujian(this.currentYujianKeyword, this.currentYujianPage + 1);
                 }
             }
         });

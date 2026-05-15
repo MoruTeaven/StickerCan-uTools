@@ -30,10 +30,10 @@
                     <span class="nav-icon mdi mdi-folder"></span>
                     <span class="nav-text">本地表情</span>
                 </button>
-                <!-- <button class="nav-item" data-view="cloud">
+                <button class="nav-item" data-view="cloud">
                     <span class="nav-icon mdi mdi-cloud"></span>
                     <span class="nav-text">云端表情</span>
-                </button> -->
+                </button>
             </nav>
 
             <div class="sidebar-stats">
@@ -41,10 +41,10 @@
                     <span class="stat-number" id="totalCount">0</span>
                     <span class="stat-label">总表情</span>
                 </div>
-                <!-- <div class="stat-item">
+                <div class="stat-item">
                     <span class="stat-number" id="cloudCount">0</span>
                     <span class="stat-label">云端</span>
-                </div> -->
+                </div>
                 <div class="stat-item">
                     <span class="stat-number" id="localCount">0</span>
                     <span class="stat-label">本地</span>
@@ -97,6 +97,9 @@
                     <button class="tab-btn" data-tab="tangdouzi">
                         糖豆子
                     </button>
+                    <button class="tab-btn" data-tab="yujian">
+                        遇见
+                    </button>
                 </div>
 
                 <!-- 统一内容区 -->
@@ -147,7 +150,7 @@
             </div>
 
             <!-- 云端表情视图 -->
-            <!-- <div id="cloudView" class="view">
+            <div id="cloudView" class="view">
                 <header class="content-header">
                     <h2><i class="mdi mdi-cloud"></i> 云端表情</h2>
                     <p class="view-description">已同步到云端，可在其他设备访问</p>
@@ -174,17 +177,21 @@
                                 <i class="mdi mdi-folder"></i>
                                 <span>本地存储</span>
                             </button>
-                            <!-- <button class="settings-nav-item" data-settings="cloud">
+                            <button class="settings-nav-item" data-settings="cloud">
                                 <i class="mdi mdi-cloud-upload"></i>
                                 <span>云端存储</span>
                             </button>
-                            <button class="settings-nav-item" data-settings="sync">
+                            <!-- <button class="settings-nav-item" data-settings="sync">
                                 <i class="mdi mdi-sync"></i>
                                 <span>同步设置</span>
                             </button-->
                             <button class="settings-nav-item" data-settings="about">
                                 <i class="mdi mdi-information"></i>
                                 <span>关于</span>
+                            </button>
+                            <button class="settings-nav-item" data-settings="changelog">
+                                <i class="mdi mdi-history"></i>
+                                <span>更新记录</span>
                             </button>
                         </div>
                     </nav>
@@ -240,30 +247,10 @@
                                 <div class="form-group">
                                 <label>图床选择</label>
                                 <select id="cloudProvider" class="form-select">
-                                    <option value="utools">uTools 内置存储（推荐）</option>
                                     <option value="imgbb">ImgBB（免费）</option>
-                                    <option value="smms">SM.MS（免费）</option>
                                     <option value="s3">S3 兼容存储</option>
-                                    <option value="github">GitHub + CDN</option>
                                 </select>
                             </div>
-
-                                <div id="utoolsConfig" class="provider-config">
-                                    <div class="config-card">
-                                        <div class="config-card-header">
-                                            <i class="mdi mdi-ufo-outline"></i>
-                                            <span>uTools 内置存储配置</span>
-                                        </div>
-                                        <p class="form-hint">
-                                            <i class="mdi mdi-check-circle"></i>
-                                            uTools 内置存储无需额外配置，直接使用即可
-                                        </p>
-                                        <p class="form-hint">
-                                            <i class="mdi mdi-information"></i>
-                                            数据存储在 uTools 私有空间，安全可靠且支持跨设备同步
-                                        </p>
-                                    </div>
-                                </div>
 
                                 <div id="imgbbConfig" class="provider-config">
                                     <div class="config-card">
@@ -276,24 +263,7 @@
                                             <input type="text" id="imgbbApiKey" placeholder="输入 ImgBB API Key">
                                             <p class="form-hint">
                                                 <i class="mdi mdi-information"></i>
-                                                前往 <a href="https://api.imgbb.com/" target="_blank">imgbb.com</a> 免费获取 API Key
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div id="smmsConfig" class="provider-config" style="display: none;">
-                                    <div class="config-card">
-                                        <div class="config-card-header">
-                                            <i class="mdi mdi-image-multiple"></i>
-                                            <span>SM.MS 配置</span>
-                                        </div>
-                                        <div class="form-group">
-                                            <label>Token</label>
-                                            <input type="password" id="smmsToken" placeholder="输入 SM.MS Token">
-                                            <p class="form-hint">
-                                                <i class="mdi mdi-information"></i>
-                                                前往 <a href="https://sm.ms/" target="_blank">sm.ms</a> 注册获取 Token
+                                                前往 <a href="https://api.imgbb.com/" data-external-link="true">imgbb.com</a> 免费获取 API Key
                                             </p>
                                         </div>
                                     </div>
@@ -337,7 +307,7 @@
                                         <i class="mdi mdi-link-variant"></i> 测试连接
                                     </button>
                                     <button id="saveSettingsBtn" class="btn btn-primary">
-                                        <i class="mdi mdi-content-save"></i> 保存设置
+                                        <i class="mdi mdi-content-save"></i> 保存路径
                                     </button>
                                 </div>
                             </div>
@@ -412,7 +382,7 @@
                                         <i class="mdi mdi-sync"></i> 立即同步
                                     </button>
                                     <button class="btn btn-primary" onclick="document.getElementById('saveSettingsBtn').click()">
-                                        <i class="mdi mdi-content-save"></i> 保存设置
+                                        <i class="mdi mdi-content-save"></i> 保存路径
                                     </button>
                                 </div>
                             </div>
@@ -444,6 +414,27 @@
                                         <p class="form-hint">
                                             <i class="mdi mdi-information"></i>
                                             本地存储的表情包不会同步到其他设备，适合隐私敏感内容
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div class="config-card">
+                                    <div class="config-card-header">
+                                        <i class="mdi mdi-delete"></i>
+                                        <span>删除设置</span>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>删除表情包时</label>
+                                        <div class="toggle-group">
+                                            <label class="toggle-switch">
+                                                <input type="checkbox" id="deleteLocalFile">
+                                                <span class="toggle-slider"></span>
+                                            </label>
+                                            <span class="toggle-label">同时删除本地文件</span>
+                                        </div>
+                                        <p class="form-hint">
+                                            <i class="mdi mdi-lightbulb"></i>
+                                            关闭后，删除表情包仅移除记录，保留本地文件
                                         </p>
                                     </div>
                                 </div>
@@ -483,12 +474,16 @@
                                 <div class="about-features">
                                     <div class="feature-item">
                                         <i class="mdi mdi-check-circle"></i>
-                                        <span>本地<!--/云端混合-->存储</span>
+                                        <span>本地/云端混合存储</span>
                                     </div>
-                                    <!-- <div class="feature-item">
+                                    <div class="feature-item">
                                         <i class="mdi mdi-check-circle"></i>
                                         <span>多种图床支持</span>
-                                    </div> -->
+                                    </div>
+                                    <div class="feature-item">
+                                        <i class="mdi mdi-check-circle"></i>
+                                        <span>多标签搜索</span>
+                                    </div>
                                     <!-- <div class="feature-item">
                                         <i class="mdi mdi-check-circle"></i>
                                         <span>多设备同步</span>
@@ -512,6 +507,18 @@
                                         <i class="mdi mdi-message-text"></i>
                                         <span>反馈建议</span>
                                     </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 更新记录 -->
+                        <div id="settingsChangelog" class="settings-panel">
+                            <div class="settings-panel-header">
+                                <h3><i class="mdi mdi-history"></i> 更新记录</h3>
+                                <p class="settings-panel-desc">版本更新历史与变更说明</p>
+                            </div>
+                            <div class="settings-panel-body">
+                                <div class="changelog-timeline" id="changelogTimeline">
                                 </div>
                             </div>
                         </div>
@@ -588,10 +595,10 @@
                                 <i class="mdi mdi-folder"></i>
                                 <span>本地</span>
                             </button>
-                            <!-- <button class="toggle-btn" data-storage="cloud">
+                            <button class="toggle-btn" data-storage="cloud">
                                 <i class="mdi mdi-cloud"></i>
                                 <span>云端</span>
-                            </button> -->
+                            </button>
                         </div>
                         <p class="storage-hint" id="storageHint">
                             <i class="mdi mdi-information"></i> 本地存储不会同步到其他设备
@@ -656,6 +663,7 @@
     <script src="ui-manager.js"></script>
     <script src="storage-manager.js"></script>
     <script src="emotion-manager.js"></script>
+    <script src="changelog-manager.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

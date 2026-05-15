@@ -1,4 +1,24 @@
 class StorageManager {
+    // 带超时的 fetch 请求
+    async fetchWithTimeout(url, options = {}, timeout = 30000) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeout);
+        
+        try {
+            const response = await fetch(url, {
+                ...options,
+                signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+            return response;
+        } catch (error) {
+            clearTimeout(timeoutId);
+            if (error.name === 'AbortError') {
+                throw new Error('请求超时，请检查网络连接');
+            }
+            throw error;
+        }
+    }
     constructor(emotionManager) {
         this.emotionManager = emotionManager;
         this.selectedStorage = 'local';
@@ -32,23 +52,13 @@ class StorageManager {
         const provider = settings.cloudProvider;
         if (!provider) return false;
         
-        if (provider === 'utools') {
-            return true;
-        } else if (provider === 'imgbb') {
+        if (provider === 'imgbb') {
             return settings.cloudConfig && settings.cloudConfig.imgbbApiKey && settings.cloudConfig.imgbbApiKey.trim() !== '';
-        } else if (provider === 'smms') {
-            return settings.cloudConfig && settings.cloudConfig.smmsToken && settings.cloudConfig.smmsToken.trim() !== '';
         } else if (provider === 's3') {
             return settings.cloudConfig && 
                    settings.cloudConfig.s3Endpoint && 
                    settings.cloudConfig.s3AccessKey && 
                    settings.cloudConfig.s3SecretKey && 
-                   settings.cloudConfig.s3Bucket;
-        } else if (provider === 'github') {
-            return settings.cloudConfig && 
-                   settings.cloudConfig.s3Endpoint &&
-                   settings.cloudConfig.s3AccessKey &&
-                   settings.cloudConfig.s3SecretKey &&
                    settings.cloudConfig.s3Bucket;
         }
         return false;
@@ -66,6 +76,20 @@ class StorageManager {
             }
             return null;
         }
+    }
+
+    getLocalConfigHint() {
+        if (!this.checkLocalConfig()) {
+            return '请先在设置中配置本地存储路径';
+        }
+        return null;
+    }
+
+    getCloudConfigHint() {
+        if (!this.checkCloudConfig()) {
+            return '请先在设置中配置云存储';
+        }
+        return null;
     }
 
     async selectLocalFolder() {
@@ -147,50 +171,12 @@ class StorageManager {
     async uploadToCloud(file) {
         const provider = this.emotionManager.dataManager.settings.cloudProvider;
         
-        if (provider === 'utools') {
-            return await this.uploadToUtools(file);
-        } else if (provider === 'imgbb') {
+        if (provider === 'imgbb') {
             return await this.uploadToImgbb(file);
-        } else if (provider === 'smms') {
-            return await this.uploadToSmms(file);
         } else if (provider === 's3') {
             return await this.uploadToS3(file);
-        } else if (provider === 'github') {
-            return await this.uploadToGithub(file);
         } else {
             throw new Error('请先配置云存储');
-        }
-    }
-
-    async uploadToUtools(file) {
-        try {
-            console.log('开始上传到 uTools 存储');
-            
-            if (typeof utools === 'undefined') {
-                throw new Error('非 uTools 环境，无法使用 uTools 存储');
-            }
-
-            const fileExt = file.name.split('.').pop();
-            const fileName = `emotion_${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
-            
-            const base64Data = await this.fileToBase64(file);
-            
-            const fileId = `utools_file_${fileName}`;
-            await utools.db.put({
-                _id: fileId,
-                fileName: fileName,
-                fileType: file.type,
-                fileSize: file.size,
-                data: base64Data,
-                uploadTime: new Date().toISOString()
-            });
-            
-            console.log('文件上传到 uTools 存储成功:', fileName);
-            
-            return `utools://${fileId}`;
-        } catch (error) {
-            console.error('上传到 uTools 存储失败:', error);
-            throw new Error('上传到 uTools 存储失败: ' + error.message);
         }
     }
 
@@ -203,7 +189,7 @@ class StorageManager {
         const formData = new FormData();
         formData.append('image', file);
         
-        const response = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
+        const response = await this.fetchWithTimeout(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
             method: 'POST',
             body: formData
         });
@@ -214,32 +200,6 @@ class StorageManager {
             return data.data.url;
         } else {
             throw new Error(data.error?.message || '上传失败');
-        }
-    }
-
-    async uploadToSmms(file) {
-        const token = this.emotionManager.dataManager.settings.cloudConfig.smmsToken;
-        if (!token) {
-            throw new Error('请先配置SM.MS Token');
-        }
-        
-        const formData = new FormData();
-        formData.append('smfile', file);
-        
-        const response = await fetch('https://sm.ms/api/v2/upload', {
-            method: 'POST',
-            headers: {
-                'Authorization': token
-            },
-            body: formData
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            return data.data.url;
-        } else {
-            throw new Error(data.images || data.msg || '上传失败');
         }
     }
 
@@ -301,7 +261,7 @@ class StorageManager {
         const authHeader = `${algorithm} Credential=${config.s3AccessKey}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
         
         try {
-            const response = await fetch(`${config.s3Endpoint}/${fileName}`, {
+            const response = await this.fetchWithTimeout(`${config.s3Endpoint}/${fileName}`, {
                 method: 'PUT',
                 headers: {
                     'Authorization': authHeader,
@@ -321,52 +281,6 @@ class StorageManager {
         } catch (error) {
             console.error('S3上传失败:', error);
             throw new Error('S3上传失败: ' + error.message);
-        }
-    }
-
-    async uploadToGithub(file) {
-        const config = this.emotionManager.dataManager.settings.cloudConfig;
-        if (!config.s3Endpoint || !config.s3AccessKey || !config.s3Bucket) {
-            throw new Error('请先配置GitHub仓库信息');
-        }
-        
-        const parts = config.s3Endpoint.split('/');
-        const owner = parts[parts.length - 2] || '';
-        const repo = parts[parts.length - 1] || '';
-        
-        const fileName = `emotions/${Date.now()}_${Math.random().toString(36).substr(2, 9)}_${file.name}`;
-        const filePath = (config.s3Region || 'main') + '/' + fileName;
-        
-        const base64Data = await this.fileToBase64(file);
-        const content = base64Data.split(',')[1];
-        
-        const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${filePath}`;
-        
-        try {
-            const response = await fetch(apiUrl, {
-                method: 'PUT',
-                headers: {
-                    'Authorization': `token ${config.s3AccessKey}`,
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/vnd.github.v3+json'
-                },
-                body: JSON.stringify({
-                    message: `Upload emotion: ${file.name}`,
-                    content: content
-                })
-            });
-            
-            if (response.ok) {
-                const data = await response.json();
-                const cdnBase = config.s3Bucket.replace(/\/$/, '') || 'https://cdn.jsdelivr.net/gh';
-                return `${cdnBase}/${owner}/${repo}/${filePath}`;
-            } else {
-                const errorData = await response.json();
-                throw new Error(errorData.message || `GitHub上传失败: ${response.status}`);
-            }
-        } catch (error) {
-            console.error('GitHub上传失败:', error);
-            throw new Error('GitHub上传失败: ' + error.message);
         }
     }
 
@@ -412,7 +326,7 @@ class StorageManager {
         const provider = this.emotionManager.dataManager.settings.cloudProvider;
         
         try {
-            const response = await fetch(imageUrl);
+            const response = await this.fetchWithTimeout(imageUrl);
             if (!response.ok) {
                 throw new Error('下载图片失败');
             }
@@ -425,16 +339,10 @@ class StorageManager {
             
             const file = new File([blob], fileName, { type: mimeType });
             
-            if (provider === 'utools') {
-                return await this.uploadToUtools(file);
-            } else if (provider === 'imgbb') {
+            if (provider === 'imgbb') {
                 return await this.uploadToImgbb(file);
-            } else if (provider === 'smms') {
-                return await this.uploadToSmms(file);
             } else if (provider === 's3') {
                 return await this.uploadToS3(file);
-            } else if (provider === 'github') {
-                return await this.uploadToGithub(file);
             } else {
                 throw new Error('请先配置云存储');
             }
@@ -451,7 +359,7 @@ class StorageManager {
         }
         
         try {
-            const response = await fetch(imageUrl);
+            const response = await this.fetchWithTimeout(imageUrl);
             if (!response.ok) {
                 throw new Error('下载图片失败');
             }
@@ -511,24 +419,6 @@ class StorageManager {
     }
 
     getImageSrc(emotion) {
-        if (emotion.url && emotion.url.startsWith('utools://')) {
-            return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iIzMzMyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIzk5OSI+57qn5LmGPC90ZXh0Pjwvc3ZnPg==';
-        }
         return emotion.url;
-    }
-
-    async loadUtoolsImage(emotion, imgElement) {
-        try {
-            if (emotion.url && emotion.url.startsWith('utools://')) {
-                const fileId = emotion.url.replace('utools://', '');
-                const fileData = await utools.db.get(fileId);
-                
-                if (fileData && fileData.data) {
-                    imgElement.src = fileData.data;
-                }
-            }
-        } catch (error) {
-            console.error('加载 uTools 图片失败:', error);
-        }
     }
 }

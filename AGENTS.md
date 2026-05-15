@@ -545,6 +545,90 @@ class ThemeManager {
 
 ---
 
+## 🔗 外部链接处理规范
+
+### 问题背景
+
+uTools 插件环境中，普通的 `<a>` 标签链接无法正常跳转，需要使用 uTools API 来打开外部链接。
+
+### 统一处理方式
+
+项目采用 `data-external-link` 属性 + JavaScript 统一处理的方式：
+
+### 1. HTML 写法
+
+```html
+<!-- 普通文本链接 -->
+<a href="https://example.com" data-external-link="true">访问网站</a>
+
+<!-- 带样式的链接 -->
+<a href="https://example.com" class="about-link" data-external-link="true">
+    <i class="mdi mdi-link-variant"></i>
+    <span>官方链接</span>
+</a>
+```
+
+### 2. JavaScript 处理逻辑
+
+在 emotion-manager.js 中统一处理：
+
+```javascript
+// 处理外部链接点击事件
+document.querySelectorAll('[data-external-link="true"]').forEach(link => {
+    link.addEventListener('click', (e) => {
+        e.preventDefault();
+        const url = link.getAttribute('href');
+        if (typeof utools !== 'undefined' && utools.shellOpenExternal) {
+            utools.shellOpenExternal(url);
+        } else {
+            window.open(url, '_blank');
+        }
+    });
+});
+```
+
+### 3. CSS 样式
+
+```css
+/* 普通链接样式 */
+a[data-external-link="true"] {
+    color: var(--accent-color);
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+a[data-external-link="true"]:hover {
+    opacity: 0.7;
+}
+
+/* 图标按钮样式（用于 about 页面等） */
+a.about-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 20px;
+    border: 2px solid var(--accent-color);
+    border-radius: 10px;
+    color: var(--text-primary);
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+a.about-link:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+}
+```
+
+### 注意事项
+
+1. **不要使用 `target="_blank"`**：uTools 环境不支持
+2. **不要用按钮 + onclick**：统一使用 `<a>` + `data-external-link` 属性方式
+3. **统一处理**：所有外部链接都要添加 `data-external-link="true"` 属性，由 JavaScript 统一拦截处理
+4. **备用方案**：代码中保留了 `window.open()` 作为 fallback，确保开发环境也能正常测试
+
+---
+
 ## 📚 uTools API 参考
 
 ### 数据库 API
@@ -755,3 +839,6 @@ const fs = require('fs');
 3. **CORS限制**：浏览器环境下直接上传到S3需要预签名URL或后端代理
 4. **大文件处理**：大图片需要压缩或分片上传
 5. **同步冲突**：多设备同时修改需要冲突处理策略
+
+
+如果增加了新的功能需要吧需要的添加到AGENTS.md中

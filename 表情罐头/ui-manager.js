@@ -95,7 +95,7 @@ class UIManager {
         }
 
         if (tabName === 'mine') {
-            this.emotionManager.renderEmotions(this.emotionManager.dataManager.emotions);
+            this.emotionManager.renderEmotions(this.emotionManager.dataManager.getAllEmotions());
         } else {
             const keyword = document.getElementById('searchInput').value.trim();
             if (keyword) {
@@ -162,9 +162,9 @@ class UIManager {
     }
 
     updateStats() {
-        const total = this.emotionManager.dataManager.emotions.length;
-        const cloudCount = this.emotionManager.dataManager.emotions.filter(e => e.storageType === 'cloud').length;
-        const localCount = this.emotionManager.dataManager.emotions.filter(e => e.storageType === 'local').length;
+        const total = this.emotionManager.dataManager.getAllEmotions().length;
+        const cloudCount = this.emotionManager.dataManager.emotions.cloud.length;
+        const localCount = this.emotionManager.dataManager.emotions.local.length;
         
         const totalEl = document.getElementById('totalCount');
         const cloudEl = document.getElementById('cloudCount');
@@ -226,7 +226,7 @@ class UIManager {
             themeRadio.checked = true;
         }
 
-        document.getElementById('cloudProvider').value = settings.cloudProvider || 'utools';
+        document.getElementById('cloudProvider').value = settings.cloudProvider || 'imgbb';
         document.getElementById('localPath').value = settings.localPath || '';
         console.log('设置本地路径到表单:', settings.localPath);
         
@@ -240,8 +240,6 @@ class UIManager {
             document.getElementById('s3Region').value = settings.cloudConfig.s3Region || '';
             const imgbbApiKeyInput = document.getElementById('imgbbApiKey');
             if (imgbbApiKeyInput) imgbbApiKeyInput.value = settings.cloudConfig.imgbbApiKey || '';
-            const smmsTokenInput = document.getElementById('smmsToken');
-            if (smmsTokenInput) smmsTokenInput.value = settings.cloudConfig.smmsToken || '';
         }
         
         if (settings.syncConfig) {
@@ -250,30 +248,27 @@ class UIManager {
             document.getElementById('webdavPassword').value = settings.syncConfig.webdavPassword || '';
             document.getElementById('gitRemote').value = settings.syncConfig.gitRemote || '';
         }
-        
-        this.emotionManager.toggleCloudConfig(settings.cloudProvider || 'utools');
+
+        const deleteLocalFileCheckbox = document.getElementById('deleteLocalFile');
+        if (deleteLocalFileCheckbox) {
+            deleteLocalFileCheckbox.checked = settings.deleteLocalFile || false;
+        }
+
+        this.emotionManager.toggleCloudConfig(settings.cloudProvider || 'imgbb');
         this.emotionManager.toggleSyncConfig(settings.syncConfig?.provider || 'none');
     }
 
     toggleCloudConfig(provider) {
         const s3Config = document.getElementById('s3Config');
         const imgbbConfig = document.getElementById('imgbbConfig');
-        const smmsConfig = document.getElementById('smmsConfig');
-        const utoolsConfig = document.getElementById('utoolsConfig');
         
         s3Config.style.display = 'none';
         imgbbConfig.style.display = 'none';
-        smmsConfig.style.display = 'none';
-        utoolsConfig.style.display = 'none';
         
-        if (provider === 'utools') {
-            utoolsConfig.style.display = 'block';
-        } else if (provider === 's3' || provider === 'github') {
+        if (provider === 's3') {
             s3Config.style.display = 'block';
         } else if (provider === 'imgbb') {
             imgbbConfig.style.display = 'block';
-        } else if (provider === 'smms') {
-            smmsConfig.style.display = 'block';
         }
     }
 
