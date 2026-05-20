@@ -39,7 +39,7 @@
 
 // 设置数据结构
 {
-  cloudProvider: 's3' | 'github' | 'imgbb' | 'smms' | 'custom',
+  cloudProvider: 's3' | 'github' | 'imgbb' | 'smms' | 'tucang' | 'custom',
   localPath: string,       // 本地存储路径
   cloudConfig: {
     // S3配置
@@ -54,7 +54,10 @@
     githubPath?: string,
     // 第三方图床
     imgbbApiKey?: string,
-    smmsToken?: string
+    smmsToken?: string,
+    // 图仓配置
+    tucangToken?: string,
+    tucangFolderId?: number
   },
   syncConfig: {
     enabled: boolean,
@@ -93,7 +96,95 @@
 **第三方图床API**
 - ImgBB（免费，无需服务器）
 - SM.MS（免费，无需服务器）
+- 图仓（免费，支持文件夹管理）
 - 自定义API
+
+#### 1.2.2 图仓（TuCang）上传技术方案
+
+图仓是一个免费的云端图床服务，支持上传图片到云端并获取访问URL。
+
+**API接口**
+- 上传地址：`https://api.tucang.cc/api/v1/upload`
+- 请求类型：POST（multipart/form-data）
+
+**请求参数**
+| 参数 | 类型 | 必须 | 说明 |
+|------|------|------|------|
+| token | String | 是 | 图仓 Token，可在 App - 我的 - 设置 - Token 获取 |
+| file | File | 否 | 要上传的文件，与 url 二选一 |
+| url | String | 否 | 图片地址，与 file 二选一 |
+| referer | String | 否 | 通过 url 上传时的 Referer（应对跨域/防盗链） |
+| type | String | 否 | 图片后缀，如 png（前面不需要带点） |
+| folderId | Number | 否 | 文件夹 ID，不传则上传到根目录 |
+
+**返回格式**
+```json
+{
+  "code": "200",
+  "msg": "请求成功",
+  "data": {
+    "url": "https://img.tucang.cc/api/image/show/xxxx",
+    "md5": "xxxx"
+  },
+  "success": true
+}
+```
+
+**storage-manager.js 核心方法**
+- `uploadToTucang(file)`: 上传文件到图仓
+- 使用浏览器 fetch 直接上传（无需 Node.js 辅助）
+
+**注意事项**
+- 图仓服务可能不稳定，建议做好本地缓存和重试机制
+- Token 获取方式：图仓 App - 我的 - 设置 - Token
+
+#### 1.2.1 S3上传技术方案
+
+S3上传采用**Node.js优先策略**，绕过浏览器CORS限制：
+
+**问题背景**
+- 浏览器fetch API受同源策略限制，无法直接上传到第三方S3存储
+- 大多数S3兼容存储（七牛云、阿里OSS等）默认不支持浏览器直接请求
+- 普通PUT请求会被CORS拦截，导致"Failed to fetch"错误
+
+**解决方案**
+利用uTools插件的Node.js能力，在服务端发起HTTP请求：
+
+```javascript
+// preload.js 暴露的API
+window.emotionCan = {
+    // Node.js HTTP请求（绕过CORS）
+    nodeFetch: function(url, options) { ... },
+    
+    // 下载图片（返回Buffer和dataUrl）
+    downloadImage: function(imageUrl) { ... },
+    
+    // 上传数据到S3（Node.js方式）
+    uploadToS3Node: function(s3Config, fileName, data, contentType) { ... }
+}
+```
+
+**上传流程**
+1. 强制使用Node.js `uploadToS3Node` 方法
+2. 不使用浏览器fetch回退（因CORS问题不可靠）
+3. 自动处理数据格式转换（File → Buffer → Uint8Array）
+
+**错误处理**
+- Node.js环境不可用时抛出明确错误提示
+- 上传失败时返回详细的HTTP状态码和错误信息
+- 请求超时自动终止并提示
+
+**优势**
+- ✅ 绕过CORS限制，无需配置S3的CORS策略
+- ✅ 支持所有S3兼容存储
+- ✅ 更稳定，不受浏览器插件影响
+- ✅ 完整的错误响应信息
+
+**storage-manager.js 核心方法**
+- `downloadImage()`: 统一下载方法（Node.js优先）
+- `uploadToS3()`: S3上传（仅Node.js方式，不再回退到浏览器）
+- `generateAuthHeader()`: 生成AWS签名认证头
+- `getAmzDate()`: 生成AWS格式日期
 
 #### 1.3 混合存储
 - 用户可同时使用本地和云端

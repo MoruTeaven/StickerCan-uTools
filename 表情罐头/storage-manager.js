@@ -19,6 +19,54 @@ class StorageManager {
             throw error;
         }
     }
+
+    // Node.js HTTP请求（绕过CORS）
+    async nodeFetch(url, options = {}) {
+        if (window.emotionCan && typeof window.emotionCan.nodeFetch === 'function') {
+            try {
+                return await window.emotionCan.nodeFetch(url, options);
+            } catch (error) {
+                console.warn('Node.js请求失败，尝试浏览器fetch:', error);
+                return null;
+            }
+        }
+        return null;
+    }
+
+    // 下载图片（优先使用Node.js）
+    async downloadImage(imageUrl) {
+        // 尝试Node.js方式
+        if (window.emotionCan && typeof window.emotionCan.downloadImage === 'function') {
+            try {
+                return await window.emotionCan.downloadImage(imageUrl);
+            } catch (error) {
+                console.warn('Node.js下载失败，尝试浏览器fetch:', error);
+            }
+        }
+        
+        // 回退到浏览器fetch
+        const response = await this.fetchWithTimeout(imageUrl);
+        if (!response.ok) {
+            throw new Error('下载图片失败');
+        }
+        
+        const blob = await response.blob();
+        const contentType = blob.type || 'image/png';
+        const reader = new FileReader();
+        
+        return new Promise((resolve, reject) => {
+            reader.onload = () => {
+                resolve({
+                    dataUrl: reader.result,
+                    buffer: null,
+                    contentType: contentType
+                });
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+    }
+
     constructor(emotionManager) {
         this.emotionManager = emotionManager;
         this.selectedStorage = 'local';
@@ -60,6 +108,8 @@ class StorageManager {
                    settings.cloudConfig.s3AccessKey && 
                    settings.cloudConfig.s3SecretKey && 
                    settings.cloudConfig.s3Bucket;
+        } else if (provider === 'tucang') {
+            return settings.cloudConfig && settings.cloudConfig.tucangToken && settings.cloudConfig.tucangToken.trim() !== '';
         }
         return false;
     }
@@ -175,6 +225,8 @@ class StorageManager {
             return await this.uploadToImgbb(file);
         } else if (provider === 's3') {
             return await this.uploadToS3(file);
+        } else if (provider === 'tucang') {
+            return await this.uploadToTucang(file);
         } else {
             throw new Error('请先配置云存储');
         }
@@ -203,6 +255,35 @@ class StorageManager {
         }
     }
 
+    async uploadToTucang(file) {
+        const token = this.emotionManager.dataManager.settings.cloudConfig.tucangToken;
+        if (!token) {
+            throw new Error('请先配置图仓Token');
+        }
+
+        const formData = new FormData();
+        formData.append('token', token);
+        formData.append('file', file);
+
+        const folderId = this.emotionManager.dataManager.settings.cloudConfig.tucangFolderId;
+        if (folderId && folderId > 0) {
+            formData.append('folderId', folderId);
+        }
+
+        const response = await this.fetchWithTimeout('https://api.tucang.cc/api/v1/upload', {
+            method: 'POST',
+            body: formData
+        });
+
+        const data = await response.json();
+
+        if (data.success && data.code === '200') {
+            return data.data.url;
+        } else {
+            throw new Error(data.msg || '图仓上传失败');
+        }
+    }
+
     async uploadToS3(file) {
         const config = this.emotionManager.dataManager.settings.cloudConfig;
         if (!config.s3Endpoint || !config.s3AccessKey || !config.s3SecretKey || !config.s3Bucket) {
@@ -210,14 +291,44 @@ class StorageManager {
         }
         
         const fileName = `emotions/${Date.now()}_${Math.random().toString(36).substr(2, 9)}_${file.name}`;
-        const base64Data = await this.fileToBase64(file);
-        const binaryData = atob(base64Data.split(',')[1]);
-        const arrayBuffer = new ArrayBuffer(binaryData.length);
-        const uint8Array = new Uint8Array(arrayBuffer);
-        for (let i = 0; i < binaryData.length; i++) {
-            uint8Array[i] = binaryData.charCodeAt(i);
+        let fileData;
+        
+        if (file instanceof ArrayBuffer || file instanceof Uint8Array) {
+            fileData = new Uint8Array(file);
+        } else {
+            const base64Data = await this.fileToBase64(file);
+            const binaryData = atob(base64Data.split(',')[1]);
+            fileData = new Uint8Array(binaryData.length);
+            for (let i = 0; i < binaryData.length; i++) {
+                fileData[i] = binaryData.charCodeAt(i);
+            }
         }
         
+        if (window.emotionCan && typeof window.emotionCan.uploadToS3Node === 'function') {
+            const s3Config = {
+                s3Endpoint: config.s3Endpoint,
+                customHeaders: {
+                    'Authorization': await this.generateAuthHeader(config, fileName, fileData, file.type || 'image/png'),
+                    'Content-Type': file.type || 'image/png',
+                    'x-amz-content-sha256': await this.hash256(fileData),
+                    'x-amz-date': this.getAmzDate()
+                }
+            };
+            
+            const result = await window.emotionCan.uploadToS3Node(
+                s3Config,
+                fileName,
+                fileData,
+                file.type || 'image/png'
+            );
+            return result;
+        } else {
+            throw new Error('Node.js环境不可用，无法上传到S3。请确保在uTools环境中运行此插件。');
+        }
+    }
+
+    // 生成S3认证头
+    async generateAuthHeader(config, fileName, fileData, contentType) {
         const host = config.s3Endpoint.replace(/^https?:\/\//, '');
         const region = config.s3Region || 'us-east-1';
         
@@ -225,7 +336,7 @@ class StorageManager {
         const dateStamp = date.substr(0, 8);
         const amzDate = date.substr(0, 8) + 'T' + date.substr(9, 6) + 'Z';
         
-        const payloadHash = await this.hash256(arrayBuffer);
+        const payloadHash = await this.hash256(fileData);
         
         const canonicalUri = '/' + fileName;
         const canonicalQuerystring = '';
@@ -258,30 +369,13 @@ class StorageManager {
         );
         const signature = await this.hmacSha256(signingKey, stringToSign);
         
-        const authHeader = `${algorithm} Credential=${config.s3AccessKey}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
-        
-        try {
-            const response = await this.fetchWithTimeout(`${config.s3Endpoint}/${fileName}`, {
-                method: 'PUT',
-                headers: {
-                    'Authorization': authHeader,
-                    'Content-Type': file.type,
-                    'x-amz-content-sha256': payloadHash,
-                    'x-amz-date': amzDate
-                },
-                body: uint8Array
-            });
-            
-            if (response.ok || response.status === 200) {
-                const cdnUrl = config.s3Endpoint.replace(/\/$/, '');
-                return `${cdnUrl}/${fileName}`;
-            } else {
-                throw new Error(`S3上传失败: ${response.status} ${response.statusText}`);
-            }
-        } catch (error) {
-            console.error('S3上传失败:', error);
-            throw new Error('S3上传失败: ' + error.message);
-        }
+        return `${algorithm} Credential=${config.s3AccessKey}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
+    }
+
+    // 获取AWS日期
+    getAmzDate() {
+        const date = new Date().toISOString().replace(/[:-]|\.\d{3}/g, '');
+        return date.substr(0, 8) + 'T' + date.substr(9, 6) + 'Z';
     }
 
     async hash256(message) {
@@ -326,23 +420,27 @@ class StorageManager {
         const provider = this.emotionManager.dataManager.settings.cloudProvider;
         
         try {
-            const response = await this.fetchWithTimeout(imageUrl);
-            if (!response.ok) {
-                throw new Error('下载图片失败');
-            }
+            const imageData = await this.downloadImage(imageUrl);
             
-            const blob = await response.blob();
-            
-            const mimeType = blob.type || 'image/png';
+            const mimeType = imageData.contentType || 'image/png';
             const extension = this.getExtensionFromMimeType(mimeType);
             const fileName = `emotion_${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${extension}`;
             
-            const file = new File([blob], fileName, { type: mimeType });
+            let file;
+            if (imageData.buffer) {
+                file = new File([imageData.buffer], fileName, { type: mimeType });
+            } else {
+                const response = await this.fetchWithTimeout(imageUrl);
+                const blob = await response.blob();
+                file = new File([blob], fileName, { type: mimeType });
+            }
             
             if (provider === 'imgbb') {
                 return await this.uploadToImgbb(file);
             } else if (provider === 's3') {
                 return await this.uploadToS3(file);
+            } else if (provider === 'tucang') {
+                return await this.uploadToTucang(file);
             } else {
                 throw new Error('请先配置云存储');
             }
@@ -359,26 +457,23 @@ class StorageManager {
         }
         
         try {
-            const response = await this.fetchWithTimeout(imageUrl);
-            if (!response.ok) {
-                throw new Error('下载图片失败');
-            }
+            // 使用新的downloadImage方法（优先Node.js，绕过CORS）
+            const imageData = await this.downloadImage(imageUrl);
             
-            const blob = await response.blob();
-            
-            const mimeType = blob.type || 'image/png';
+            const mimeType = imageData.contentType || 'image/png';
             const extension = this.getExtensionFromMimeType(mimeType);
             
             const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${extension}`;
             const fullPath = `${settings.localPath}/${fileName}`;
             
-            const base64 = await this.blobToBase64(blob);
-            
             if (window.emotionCan && typeof window.emotionCan.saveFile === 'function') {
+                const base64 = imageData.dataUrl;
                 const savedPath = await window.emotionCan.saveFile(base64, fullPath);
                 const fileUrl = `file://${savedPath.replace(/\\/g, '/')}`;
                 return fileUrl;
             } else {
+                // 回退：创建Blob URL
+                const blob = await (await this.fetchWithTimeout(imageUrl)).blob();
                 return URL.createObjectURL(blob);
             }
         } catch (error) {

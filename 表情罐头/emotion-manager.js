@@ -846,8 +846,7 @@ class EmotionManager {
 
             this.dataManager.addEmotion(emotion, storageType);
             await this.dataManager.saveData();
-            this.switchTab('mine');
-            this.renderEmotions(this.dataManager.getAllEmotions());
+            this.uiManager.updateStats();
             this.showMessage('表情包添加成功', 'success');
         } catch (error) {
             console.error('添加表情包失败:', error);
@@ -882,8 +881,7 @@ class EmotionManager {
 
             this.dataManager.addEmotion(emotion, 'local');
             await this.dataManager.saveData();
-            this.switchTab('mine');
-            this.renderEmotions(this.dataManager.getAllEmotions());
+            this.uiManager.updateStats();
             this.showMessage('表情包下载成功', 'success');
         } catch (error) {
             console.error('下载表情包失败:', error);
@@ -918,8 +916,7 @@ class EmotionManager {
 
             this.dataManager.addEmotion(emotion, 'cloud');
             await this.dataManager.saveData();
-            this.switchTab('mine');
-            this.renderEmotions(this.dataManager.getAllEmotions());
+            this.uiManager.updateStats();
             this.showMessage('表情包上传成功', 'success');
         } catch (error) {
             console.error('上传表情包失败:', error);
@@ -1072,6 +1069,10 @@ class EmotionManager {
                 this.dataManager.settings.cloudConfig.s3SecretKey = document.getElementById('s3SecretKey').value;
                 this.dataManager.settings.cloudConfig.s3Bucket = document.getElementById('s3Bucket').value;
                 this.dataManager.settings.cloudConfig.s3Region = document.getElementById('s3Region').value;
+            } else if (cloudProvider === 'tucang') {
+                this.dataManager.settings.cloudConfig.tucangToken = document.getElementById('tucangToken').value;
+                const folderIdInput = document.getElementById('tucangFolderId');
+                this.dataManager.settings.cloudConfig.tucangFolderId = folderIdInput ? parseInt(folderIdInput.value) || 0 : 0;
             }
 
             console.log('准备保存到数据库的 settings:', this.dataManager.settings);
@@ -1163,6 +1164,13 @@ class EmotionManager {
                 return;
             }
             this.showMessage('S3配置已保存，请点击保存设置', 'info');
+        } else if (provider === 'tucang') {
+            const token = document.getElementById('tucangToken')?.value;
+            if (!token) {
+                this.showMessage('请先配置图仓Token', 'error');
+                return;
+            }
+            this.showMessage('图仓配置已保存，请点击保存设置', 'info');
         } else {
             this.showMessage('请检查云存储配置', 'info');
         }

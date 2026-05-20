@@ -240,6 +240,10 @@ class UIManager {
             document.getElementById('s3Region').value = settings.cloudConfig.s3Region || '';
             const imgbbApiKeyInput = document.getElementById('imgbbApiKey');
             if (imgbbApiKeyInput) imgbbApiKeyInput.value = settings.cloudConfig.imgbbApiKey || '';
+            const tucangTokenInput = document.getElementById('tucangToken');
+            if (tucangTokenInput) tucangTokenInput.value = settings.cloudConfig.tucangToken || '';
+            const tucangFolderIdInput = document.getElementById('tucangFolderId');
+            if (tucangFolderIdInput) tucangFolderIdInput.value = settings.cloudConfig.tucangFolderId || '';
         }
         
         if (settings.syncConfig) {
@@ -261,14 +265,18 @@ class UIManager {
     toggleCloudConfig(provider) {
         const s3Config = document.getElementById('s3Config');
         const imgbbConfig = document.getElementById('imgbbConfig');
+        const tucangConfig = document.getElementById('tucangConfig');
         
         s3Config.style.display = 'none';
         imgbbConfig.style.display = 'none';
+        tucangConfig.style.display = 'none';
         
         if (provider === 's3') {
             s3Config.style.display = 'block';
         } else if (provider === 'imgbb') {
             imgbbConfig.style.display = 'block';
+        } else if (provider === 'tucang') {
+            tucangConfig.style.display = 'block';
         }
     }
 

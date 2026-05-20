@@ -3,7 +3,19 @@ class ChangelogManager {
         this.versions = [
             {
                 version: '1.1.0',
-                date: '2026-05-15',
+                date: '2026-05-18',
+                changes: {
+                    added: [
+                    ],
+                    adjusted: [],
+                    fixed: ['修复了部分情况下添加表情包后自动跳转到“我的”页面'],
+                    improved: [],
+                    removed: []
+                }
+            },
+            {
+                version: '1.1.0',
+                date: '2026-05-18',
                 changes: {
                     added: [
                         '增加了云端存储功能',
@@ -12,7 +24,7 @@ class ChangelogManager {
                     ],
                     adjusted: [],
                     fixed: [],
-                    improved: ['优化了部分情况下网络请求超时、图片复制错误时的处理'],
+                    improved: ['优化了部分情况下网络请求超时、图片复制错误时的处理','优化了部分ui样式和交互细节'],
                     removed: []
                 }
             },{
