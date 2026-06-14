@@ -24,6 +24,7 @@ class EmotionManager {
         this.currentEmotion = null;
         this.currentTab = 'mine';
         this.isLightMode = false;
+        this.imageObserver = null;
         
         this.themeManager = new ThemeManager();
         this.dataManager = new DataManager();
@@ -31,18 +32,53 @@ class EmotionManager {
         this.uiManager = new UIManager(this);
         this.storageManager = new StorageManager(this);
     }
+    
+    initImageLazyLoading() {
+        this.imageObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const img = entry.target;
+                    const src = img.dataset.src;
+                    if (src) {
+                        img.src = src;
+                        img.classList.remove('lazy');
+                    }
+                    this.imageObserver.unobserve(img);
+                }
+            });
+        }, { 
+            rootMargin: '100px',
+            threshold: 0.1
+        });
+    }
+    
+    observeImages() {
+        if (!this.imageObserver) {
+            this.initImageLazyLoading();
+        }
+        
+        document.querySelectorAll('img.lazy[data-src]').forEach(img => {
+            this.imageObserver.observe(img);
+        });
+    }
 
     async init() {
         console.log('EmotionManager.init() 开始');
-        await this.dataManager.loadData();
-        this.loadTheme();
-        this.setupEventListeners();
-        this.renderAllViews();
-        this.switchView('home');
-        this.uiManager.initSidebarState();
-        this.searchManager.setupInfiniteScroll();
-        this.initChangelog();
-        console.log('EmotionManager.init() 完成');
+        this.uiManager.showLoading('正在初始化...');
+        try {
+            await this.dataManager.loadData();
+            this.loadTheme();
+            this.setupEventListeners();
+            this.initImageLazyLoading();
+            this.renderAllViews();
+            this.switchView('home');
+            this.uiManager.initSidebarState();
+            this.searchManager.setupInfiniteScroll();
+            this.initChangelog();
+            console.log('EmotionManager.init() 完成');
+        } finally {
+            this.uiManager.hideLoading();
+        }
     }
 
     initChangelog() {
@@ -393,7 +429,7 @@ class EmotionManager {
                         '<span>复制</span>' +
                     '</button>' +
                 '</div>' +
-                '<img src="' + imgSrc + '" alt="表情包" ' +
+                '<img data-src="' + imgSrc + '" class="lazy" alt="表情包" ' +
                      'data-emotion-id="' + emotion.id + '"' +
                      'onerror="this.src=\'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iIzMzMyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIzc3NyIgPkltYWdlPC90ZXh0Pjwvc3ZnPg==\'">' +
                 '<div class="tags">' +
@@ -402,6 +438,8 @@ class EmotionManager {
                 '</div>' +
             '</div>';
         }).join('');
+        
+        this.observeImages();
 
         grid.querySelectorAll('.emotion-card').forEach(card => {
             const emotionId = card.dataset.emotionId;
@@ -457,7 +495,7 @@ class EmotionManager {
                         '<span>复制</span>' +
                     '</button>' +
                 '</div>' +
-                '<img src="' + imgSrc + '" alt="表情包" ' +
+                '<img data-src="' + imgSrc + '" class="lazy" alt="表情包" ' +
                      'data-emotion-id="' + emotion.id + '"' +
                      'onerror="this.src=\'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iIzMzMyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIzc3NyIgPkltYWdlPC90ZXh0Pjwvc3ZnPg==\'">' +
                 '<div class="tags">' +
@@ -466,6 +504,8 @@ class EmotionManager {
                 '</div>' +
             '</div>';
         }).join('');
+        
+        this.observeImages();
 
         grid.querySelectorAll('.emotion-card').forEach(card => {
             const emotionId = card.dataset.emotionId;
@@ -519,7 +559,7 @@ class EmotionManager {
                         '<span>复制</span>' +
                     '</button>' +
                 '</div>' +
-                '<img src="' + imgSrc + '" alt="表情包" ' +
+                '<img data-src="' + imgSrc + '" class="lazy" alt="表情包" ' +
                      'data-emotion-id="' + emotion.id + '"' +
                      'onerror="this.src=\'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iIzMzMyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIzc3NyIgPkltYWdlPC90ZXh0Pjwvc3ZnPg==\'">' +
                 '<div class="tags">' +
@@ -528,6 +568,8 @@ class EmotionManager {
                 '</div>' +
             '</div>';
         }).join('');
+        
+        this.observeImages();
 
         grid.querySelectorAll('.emotion-card').forEach(card => {
             const emotionId = card.dataset.emotionId;

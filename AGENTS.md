@@ -4,9 +4,9 @@
 
 表情罐头是一个 uTools 平台的表情包管理插件，支持本地、云端混合存储，多源聚合搜索，以及 WebDAV/Git 同步功能。
 
-- **作者**：GC11
+- **作者**：抹露茶柒
 - **版本**：1.1.0
-- **主页**：https://github.com/gc11/emotion-can
+- **主页**：https://sticker.moruteaven.com/
 - **文档**：https://sticker.moruteaven.com/guide/
 
 ---

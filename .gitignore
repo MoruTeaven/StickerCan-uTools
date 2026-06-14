@@ -1,0 +1,26 @@
+# 编辑器和IDE配置
+.codebuddy/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 字体文件（较大，可通过包管理器获取）
+源码/lib/fonts/
+
+# 本地测试和日志
+*.log
+*.tmp
+*.bak
+
+# 项目文档（仅本地使用）
+项目缺陷报告.md
+AGENTS.md
+
+# OS 生成的文件
+.DS_Store
+Thumbs.db
+
+# 本地存储目录
+emotions/

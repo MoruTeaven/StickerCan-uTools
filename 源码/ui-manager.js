@@ -2,6 +2,38 @@ class UIManager {
     constructor(emotionManager) {
         this.emotionManager = emotionManager;
         this.sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+        this.loadingCount = 0;
+    }
+    
+    showLoading(message = '加载中...') {
+        this.loadingCount++;
+        
+        let loadingOverlay = document.getElementById('loadingOverlay');
+        if (!loadingOverlay) {
+            loadingOverlay = document.createElement('div');
+            loadingOverlay.id = 'loadingOverlay';
+            loadingOverlay.innerHTML = `
+                <div class="loading-spinner">
+                    <div class="spinner"></div>
+                    <span class="loading-text"></span>
+                </div>
+            `;
+            document.body.appendChild(loadingOverlay);
+        }
+        
+        loadingOverlay.querySelector('.loading-text').textContent = message;
+        loadingOverlay.style.display = 'flex';
+    }
+    
+    hideLoading() {
+        this.loadingCount--;
+        if (this.loadingCount <= 0) {
+            this.loadingCount = 0;
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            if (loadingOverlay) {
+                loadingOverlay.style.display = 'none';
+            }
+        }
     }
 
     initSidebarState() {
