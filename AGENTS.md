@@ -89,7 +89,6 @@ EmotionManager (核心控制器)
     originalLocalPath?: string   // 本地转云端时记录原始路径
   }
 }
-
 // 设置数据结构
 {
   cloudProvider: 'imgbb' | 'tucang' | 's3',
