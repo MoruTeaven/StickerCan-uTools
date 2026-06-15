@@ -15,7 +15,9 @@ class ChangelogManager {
                         '修复了首次保存设置时因文档不存在导致的 404 错误'
                     ],
                     improved: [],
-                    removed: []
+                    removed: [
+                        '移除了部分不需要的文件'
+                    ]
                 }
             },
             {
