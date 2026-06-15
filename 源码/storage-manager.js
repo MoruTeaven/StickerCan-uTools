@@ -305,13 +305,16 @@ class StorageManager {
         }
         
         if (window.emotionCan && typeof window.emotionCan.uploadToS3Node === 'function') {
+            const now = new Date();
+            const amzDate = this.formatAmzDate(now);
+            
             const s3Config = {
                 s3Endpoint: config.s3Endpoint,
                 customHeaders: {
-                    'Authorization': await this.generateAuthHeader(config, fileName, fileData, file.type || 'image/png'),
+                    'Authorization': await this.generateAuthHeader(config, fileName, fileData, file.type || 'image/png', now),
                     'Content-Type': file.type || 'image/png',
                     'x-amz-content-sha256': await this.hash256(fileData),
-                    'x-amz-date': this.getAmzDate()
+                    'x-amz-date': amzDate
                 }
             };
             
@@ -328,13 +331,13 @@ class StorageManager {
     }
 
     // 生成S3认证头
-    async generateAuthHeader(config, fileName, fileData, contentType) {
+    async generateAuthHeader(config, fileName, fileData, contentType, date = new Date()) {
         const host = config.s3Endpoint.replace(/^https?:\/\//, '');
         const region = config.s3Region || 'us-east-1';
         
-        const date = new Date().toISOString().replace(/[:-]|\.\d{3}/g, '');
-        const dateStamp = date.substr(0, 8);
-        const amzDate = date.substr(0, 8) + 'T' + date.substr(9, 6) + 'Z';
+        const dateStr = date.toISOString().replace(/[:-]|\.\d{3}/g, '');
+        const dateStamp = dateStr.substr(0, 8);
+        const amzDate = dateStr.substr(0, 8) + 'T' + dateStr.substr(9, 6) + 'Z';
         
         const payloadHash = await this.hash256(fileData);
         
@@ -372,10 +375,15 @@ class StorageManager {
         return `${algorithm} Credential=${config.s3AccessKey}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
     }
 
-    // 获取AWS日期
+    // 获取AWS日期（向后兼容）
     getAmzDate() {
-        const date = new Date().toISOString().replace(/[:-]|\.\d{3}/g, '');
-        return date.substr(0, 8) + 'T' + date.substr(9, 6) + 'Z';
+        return this.formatAmzDate(new Date());
+    }
+    
+    // 格式化日期为AWS格式
+    formatAmzDate(date) {
+        const dateStr = date.toISOString().replace(/[:-]|\.\d{3}/g, '');
+        return dateStr.substr(0, 8) + 'T' + dateStr.substr(9, 6) + 'Z';
     }
 
     async hash256(message) {
