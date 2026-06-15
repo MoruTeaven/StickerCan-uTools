@@ -168,7 +168,12 @@ class DataManager {
             console.log('本地表情包保存成功，key:', localEmotionsKey);
             
             // 保存云端表情包到 db（会同步）
-            const existingCloud = await utools.db.promises.get('emotions_cloud');
+            let existingCloud = null;
+            try {
+                existingCloud = await utools.db.promises.get('emotions_cloud');
+            } catch (getError) {
+                console.log('云端表情包文档不存在，将创建新文档:', getError.message);
+            }
             const cloudDoc = {
                 _id: 'emotions_cloud',
                 data: this.emotions.cloud
@@ -191,7 +196,12 @@ class DataManager {
             console.log('===== 开始保存设置 =====');
             console.log('准备保存的 settings:', this.settings);
             
-            const existingSettings = await utools.db.promises.get('settings');
+            let existingSettings = null;
+            try {
+                existingSettings = await utools.db.promises.get('settings');
+            } catch (getError) {
+                console.log('设置文档不存在，将创建新文档:', getError.message);
+            }
             const settingsDoc = {
                 _id: 'settings',
                 data: this.settings
