@@ -2,13 +2,16 @@ class ChangelogManager {
     constructor() {
         this.versions = [
             {
-                version: '1.1.0',
-                date: '2026-05-18',
+                version: '1.1.1',
+                date: '2026-06-15',
                 changes: {
                     added: [
                     ],
                     adjusted: [],
-                    fixed: ['修复了部分情况下添加表情包后自动跳转到“我的”页面'],
+                    fixed: [
+                        '修复了部分情况下添加表情包后自动跳转到“我的”页面',
+                        '修复了首次启动或云端数据不存在时本地表情包被意外清空的问题'
+                    ],
                     improved: [],
                     removed: []
                 }

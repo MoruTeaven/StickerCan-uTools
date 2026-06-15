@@ -33,30 +33,55 @@ class DataManager {
             }
             
             // 加载云端表情包（utools.db，会同步）
-            const cloudData = await utools.db.promises.get('emotions_cloud');
-            if (cloudData && cloudData.data && Array.isArray(cloudData.data)) {
-                this.emotions.cloud = cloudData.data;
-                console.log('云端表情包加载成功，数量:', this.emotions.cloud.length);
+            try {
+                const cloudData = await utools.db.promises.get('emotions_cloud');
+                if (cloudData && cloudData.data && Array.isArray(cloudData.data)) {
+                    this.emotions.cloud = cloudData.data;
+                    console.log('云端表情包加载成功，数量:', this.emotions.cloud.length);
+                }
+            } catch (cloudError) {
+                console.log('云端表情包数据不存在或加载失败，使用空数组:', cloudError.message);
             }
             
             // 检查是否需要从旧的单一结构迁移数据
-            const hasOldData = await this.checkOldData();
-            if (hasOldData) {
-                const oldData = await utools.db.promises.get('emotions');
-                if (oldData && oldData.data && Array.isArray(oldData.data)) {
-                    console.log('检测到旧数据，开始迁移...');
-                    await this.migrateOldData(oldData.data);
-                    this.migrationDone = true;
+            try {
+                const hasOldData = await this.checkOldData();
+                if (hasOldData) {
+                    const oldData = await utools.db.promises.get('emotions');
+                    if (oldData && oldData.data && Array.isArray(oldData.data)) {
+                        console.log('检测到旧数据，开始迁移...');
+                        await this.migrateOldData(oldData.data);
+                        this.migrationDone = true;
+                    }
                 }
+            } catch (migrationError) {
+                console.log('旧数据迁移检查失败或数据不存在:', migrationError.message);
             }
             
             // 加载设置
-            const settingsData = await utools.db.promises.get('settings');
-            if (settingsData) {
-                this.settings = settingsData.data;
-                console.log('设置加载成功:', this.settings);
-            } else {
-                console.log('没有找到已保存的设置，使用默认值');
+            try {
+                const settingsData = await utools.db.promises.get('settings');
+                if (settingsData) {
+                    this.settings = settingsData.data;
+                    console.log('设置加载成功:', this.settings);
+                } else {
+                    console.log('没有找到已保存的设置，使用默认值');
+                    let defaultLocalPath = 'E:\\图片\\表情包';
+                    if (window.emotionCan && typeof window.emotionCan.getDefaultDir === 'function') {
+                        defaultLocalPath = window.emotionCan.getDefaultDir();
+                    }
+                    
+                    this.settings = {
+                        cloudProvider: 'imgbb',
+                        localPath: defaultLocalPath,
+                        cloudConfig: {},
+                        syncConfig: {},
+                        deleteLocalFile: false
+                    };
+                    console.log('使用的默认 settings:', this.settings);
+                }
+            } catch (settingsError) {
+                console.log('设置数据不存在或加载失败，使用默认值:', settingsError.message);
                 let defaultLocalPath = 'E:\\图片\\表情包';
                 if (window.emotionCan && typeof window.emotionCan.getDefaultDir === 'function') {
                     defaultLocalPath = window.emotionCan.getDefaultDir();
